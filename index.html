@@ -215,7 +215,8 @@
             loader.style.display = 'flex';
 
             setTimeout(() => {
-                const pedidoEncontrado = allPedidos.find(p => p.numeroPedido && p.numeroPedido.toLowerCase() === query.toLowerCase());
+                // LÓGICA DE BUSCA ATUALIZADA: Verifica se o número do pedido está CONTIDO na busca do usuário
+                const pedidoEncontrado = allPedidos.find(p => p.numeroPedido && query.toLowerCase().includes(p.numeroPedido.toLowerCase()));
                 
                 loader.style.display = 'none';
 
@@ -279,7 +280,6 @@
     </script>
 </body>
 </html>
-
 
 
 
