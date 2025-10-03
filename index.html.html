@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rastreamentos de Pedidos AM</title>
+    <!-- Tailwind CSS para um design moderno e responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter, para uma tipografia limpa -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Estilo para usar a fonte Inter */
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* Estilo para o loader/spinner */
+        .loader {
+            border-top-color: #3498db;
+            -webkit-animation: spinner 1.5s linear infinite;
+            animation: spinner 1.s linear infinite;
+        }
+        @-webkit-keyframes spinner {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
+        }
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl mx-auto">
+        <main class="bg-white rounded-xl shadow-lg p-6 md:p-10">
+            <div class="text-center mb-8">
+                <!-- TÍTULO PRINCIPAL -->
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-800">Rastreamentos de Pedidos AM</h1>
+                <p class="text-gray-500 mt-4">Consulte seu pedido de amostras em tempo real</p>
+            </div>
+
+            <!-- Formulário de Busca -->
+            <div class="flex flex-col sm:flex-row gap-3 mb-6">
+                <input type="text" id="orderNumberInput" placeholder="Digite o número do seu pedido" class="flex-grow w-full px-4 py-3 text-gray-700 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
+                <button id="searchButton" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition duration-200 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    Buscar
+                </button>
+            </div>
+
+            <!-- Link para o site dos Correios -->
+            <div class="text-center mb-6">
+                <p class="text-sm text-gray-600">
+                    Após consultar seu rastreio, 
+                    <a href="https://rastreamento.correios.com.br/app/index.php" target="_blank" rel="noopener noreferrer" class="font-semibold text-blue-600 hover:underline">
+                        clique aqui para rastrear no site dos Correios
+                    </a>.
+                </p>
+            </div>
+
+            <!-- Observação Adicionada -->
+            <div class="bg-blue-50 border-l-4 border-blue-400 text-blue-800 p-4 rounded-r-lg mb-6" role="alert">
+                <p class="font-bold">Observação Importante</p>
+                <p class="text-sm">Após a liberação do seu pedido, o código de rastreio será adicionado aqui. Este processo pode levar algumas horas. Se o seu pedido foi liberado hoje, por favor, verifique novamente no final do dia.</p>
+            </div>
+
+            <!-- Área de Resultados -->
+            <div id="resultsArea" class="hidden">
+                <!-- Loader/Spinner de Carregamento -->
+                <div id="loader" class="hidden my-8 flex justify-center">
+                    <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12"></div>
+                </div>
+
+                <!-- Mensagem de Erro -->
+                <div id="errorMessage" class="hidden my-6 p-4 bg-red-100 text-red-700 border border-red-200 rounded-lg text-center">
+                    <p class="font-semibold">Pedido não encontrado!</p>
+                    <p class="text-sm">Por favor, verifique o número digitado e tente novamente.</p>
+                </div>
+                
+                <!-- Card de Informações do Pedido (NOVO LAYOUT) -->
+                <div id="orderDetails" class="hidden my-6 border border-gray-200 rounded-xl p-6 space-y-6">
+                    <!-- Primeira Linha: Número do Pedido e Remetente -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+                        <div>
+                            <p class="text-sm text-gray-500">Número do Pedido</p>
+                            <h2 id="orderNumber" class="text-2xl font-bold text-gray-800"></h2>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">Remetente</p>
+                            <p id="remetente" class="text-lg font-semibold text-gray-800"></p>
+                        </div>
+                    </div>
+
+                    <!-- Segunda Linha: Data de Liberação e Serviço -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 border-t border-gray-200 pt-6">
+                         <div>
+                            <p class="text-sm text-gray-500">Data de Liberação</p>
+                            <p id="releaseDate" class="font-semibold text-gray-700"></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">Serviço</p>
+                            <p id="servico" class="font-semibold text-gray-700"></p>
+                        </div>
+                    </div>
+                    
+                    <!-- Terceira Linha: Código de Rastreio -->
+                    <div class="border-t border-gray-200 pt-6">
+                        <p class="text-sm text-gray-500 mb-1">Código de Rastreio</p>
+                        <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                           <p id="trackingCode" class="font-mono text-gray-700 tracking-wider"></p>
+                           <button id="copyButton" title="Copiar código" class="p-2 rounded-md hover:bg-gray-200 transition">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                           </button>
+                        </div>
+                    </div>
+
+                    <!-- Quarta Linha: Botão de Acompanhamento -->
+                    <div class="pt-2">
+                        <a id="trackLink" href="#" target="_blank" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center">
+                            Acompanhar no site dos Correios
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ml-2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-center mt-6">
+                <p class="text-sm text-gray-500">Dúvidas sobre o rastreio? Contate-nos em:</p>
+                <a href="mailto:amostras@doremus.com.br" class="font-semibold text-blue-600 hover:underline">amostras@doremus.com.br</a>
+            </div>
+
+            <footer class="text-center mt-8">
+                <p class="text-sm text-gray-400">&copy; 2025 Doremus. Todos os direitos reservados.</p>
+            </footer>
+        </main>
+    </div>
+
+    <script>
+        // --- INÍCIO DA ÁREA DE CONFIGURAÇÃO ---
+        // COLE AQUI O LINK DA SUA PLANILHA PUBLICADA COMO CSV
+        const GOOGLE_SHEET_PUBLISHED_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQC3mPERYzFPaxVH6ZCrexvKjtWmmcWKMWjQ1_UkJrPdKm7yAZq4eyokj-4r7hO2BXGDY7d2Gk-uVLc/pub?output=csv';
+        // --- FIM DA ÁREA DE CONFIGURAÇÃO ---
+
+        // Variável para armazenar os dados da planilha
+        let allPedidos = [];
+
+        // Lógica da aplicação
+        const orderNumberInput = document.getElementById('orderNumberInput');
+        const searchButton = document.getElementById('searchButton');
+        const resultsArea = document.getElementById('resultsArea');
+        const loader = document.getElementById('loader');
+        const errorMessage = document.getElementById('errorMessage');
+        const orderDetails = document.getElementById('orderDetails');
+        
+        const orderNumberEl = document.getElementById('orderNumber');
+        const releaseDateEl = document.getElementById('releaseDate');
+        const remetenteEl = document.getElementById('remetente');
+        const servicoEl = document.getElementById('servico'); // Novo elemento
+        const trackingCodeEl = document.getElementById('trackingCode');
+        const trackLinkEl = document.getElementById('trackLink');
+        const copyButton = document.getElementById('copyButton');
+
+        // Função para buscar e processar os dados da planilha
+        const fetchSheetData = async () => {
+            if (!GOOGLE_SHEET_PUBLISHED_URL || GOOGLE_SHEET_PUBLISHED_URL.includes('COLE_SEU_LINK_AQUI')) {
+                console.error("ERRO: O link da planilha do Google Sheets não foi configurado.");
+                searchButton.disabled = true;
+                searchButton.innerHTML = 'Configure o Link';
+                searchButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                searchButton.classList.add('bg-gray-400', 'cursor-not-allowed');
+                orderNumberInput.disabled = true;
+                orderNumberInput.placeholder = 'Configuração da planilha pendente';
+                return;
+            }
+
+            try {
+                // Para contornar restrições de segurança (CORS) e evitar cache, usamos um proxy.
+                const urlWithCacheBust = `${GOOGLE_SHEET_PUBLISHED_URL}&t=${new Date().getTime()}`;
+                // O proxy 'corsproxy.io' ajuda a buscar dados de outras origens de forma segura.
+                const proxiedUrl = `https://corsproxy.io/?${encodeURIComponent(urlWithCacheBust)}`;
+                
+                const response = await fetch(proxiedUrl);
+                if (!response.ok) {
+                    throw new Error('Falha ao carregar dados da planilha. Verifique o link e as permissões de compartilhamento.');
+                }
+                const csvText = await response.text();
+                
+                const lines = csvText.trim().split('\n');
+                const headers = lines[0].split(',').map(h => h.trim());
+                allPedidos = lines.slice(1).map(line => {
+                    const values = line.split(',').map(v => v.trim());
+                    let entry = {};
+                    headers.forEach((header, i) => {
+                        entry[header] = values[i];
+                    });
+                    return entry;
+                });
+
+            } catch (error) {
+                console.error("Erro ao buscar dados:", error);
+                resultsArea.style.display = 'block';
+                errorMessage.innerHTML = `<p class="font-semibold">Erro de Configuração</p><p class="text-sm">${error.message}</p>`;
+                errorMessage.style.display = 'block';
+            }
+        };
+
+        const handleSearch = () => {
+            const query = orderNumberInput.value.trim();
+            if (!query) return;
+
+            resultsArea.style.display = 'block';
+            orderDetails.style.display = 'none';
+            errorMessage.style.display = 'none';
+            loader.style.display = 'flex';
+
+            setTimeout(() => {
+                const pedidoEncontrado = allPedidos.find(p => p.numeroPedido && p.numeroPedido.toLowerCase() === query.toLowerCase());
+                
+                loader.style.display = 'none';
+
+                if (pedidoEncontrado) {
+                    displayOrderDetails(pedidoEncontrado);
+                } else {
+                    displayError();
+                }
+            }, 800);
+        };
+
+        const displayOrderDetails = (pedido) => {
+            orderNumberEl.textContent = pedido.numeroPedido || 'N/A';
+            releaseDateEl.textContent = pedido.dataLiberacao || 'N/A';
+            remetenteEl.textContent = pedido.remetente || 'N/A';
+            servicoEl.textContent = pedido.servico || 'N/A'; // Exibe o serviço
+            trackingCodeEl.textContent = pedido.codigoRastreio || 'N/A';
+            
+            if (pedido.codigoRastreio) {
+                trackLinkEl.href = `https://rastreamento.correios.com.br/app/index.php?objetos=${pedido.codigoRastreio}`;
+            }
+
+            errorMessage.style.display = 'none';
+            orderDetails.style.display = 'block';
+        };
+
+        const displayError = () => {
+            orderDetails.style.display = 'none';
+            errorMessage.style.display = 'block';
+        };
+
+        searchButton.addEventListener('click', handleSearch);
+        orderNumberInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                handleSearch();
+            }
+        });
+        
+        copyButton.addEventListener('click', () => {
+            const codeToCopy = trackingCodeEl.textContent;
+            if (!codeToCopy || codeToCopy === 'N/A') return;
+            const textArea = document.createElement('textarea');
+            textArea.value = codeToCopy;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                copyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-600"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+                setTimeout(() => {
+                    copyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+                }, 2000);
+            } catch (err) {
+                console.error('Falha ao copiar o texto: ', err);
+            }
+            document.body.removeChild(textArea);
+        });
+
+        // Carrega os dados da planilha assim que a página é aberta
+        fetchSheetData();
+
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
