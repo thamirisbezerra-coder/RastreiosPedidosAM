@@ -37,9 +37,10 @@
             background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
         }
 
-        /* Estilo para garantir que o input não tenha zoom automático no iOS */
+        /* Melhoria de legibilidade no mobile */
         @media screen and (max-width: 768px) {
             input { font-size: 16px !important; }
+            .card-padding { padding: 1.5rem !important; }
         }
     </style>
 </head>
@@ -48,22 +49,22 @@
     <!-- Container Principal -->
     <div class="w-full max-w-4xl bg-white shadow-2xl rounded-3xl overflow-hidden border border-gray-100">
         
-        <div class="p-8 md:p-12 space-y-10">
+        <div class="p-6 md:p-12 space-y-8 md:y-10">
             
             <!-- ÁREA DA LOGO -->
             <div class="flex justify-center">
                 <img 
                     src="https://i.postimg.cc/76mXWMJh/as-02.png" 
                     alt="Logo Doremus" 
-                    class="h-24 md:h-28 object-contain transition-transform duration-500 hover:scale-105"
+                    class="h-20 md:h-28 object-contain transition-transform duration-500 hover:scale-105"
                     onerror="this.src='https://via.placeholder.com/200x80?text=Doremus'"
                 >
             </div>
 
             <!-- Cabeçalho de Texto -->
             <div class="text-center space-y-3">
-                <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">Rastreamento de Amostras</h1>
-                <p class="text-slate-500 text-lg">Consulte o status do seu pedido em tempo real</p>
+                <h1 class="text-2xl md:text-4xl font-extrabold text-slate-900 tracking-tight px-2">Rastreamento de Amostras</h1>
+                <p class="text-slate-500 text-base md:text-lg">Consulte o status do seu pedido em tempo real</p>
             </div>
 
             <!-- Área de Busca -->
@@ -75,9 +76,10 @@
                     <input 
                         type="text" 
                         id="orderNumberInput" 
-                        placeholder="Digite o número do pedido..." 
-                        class="block w-full pl-12 pr-4 py-4 rounded-xl leading-5 bg-transparent placeholder-gray-400 focus:outline-none text-xl text-gray-800"
+                        placeholder="Número do pedido..." 
+                        class="block w-full pl-12 pr-4 py-4 rounded-xl leading-5 bg-transparent placeholder-gray-400 focus:outline-none text-lg md:text-xl text-gray-800"
                         autocomplete="off"
+                        inputmode="numeric"
                     >
                 </div>
                 <button 
@@ -89,8 +91,8 @@
             </div>
 
             <!-- Mensagens de Status -->
-            <div id="statusContainer" class="hidden mx-auto max-w-max">
-                <p id="statusMessage" class="text-center text-sm font-medium py-2 px-6 rounded-lg shadow-sm border"></p>
+            <div id="statusContainer" class="hidden mx-auto max-w-lg px-4">
+                <p id="statusMessage" class="text-center text-sm font-medium py-3 px-6 rounded-lg shadow-sm border leading-relaxed"></p>
             </div>
 
             <!-- Container de Resultados -->
@@ -112,7 +114,7 @@
                         </h3>
                         <div class="mt-2 text-sm text-amber-700 leading-relaxed text-justify">
                             <p>
-                                Após a liberação do seu pedido, o código de rastreio será adicionado aqui. Este processo pode levar algumas horas devido à integração com a transportadora.
+                                Após a liberação do seu pedido, o código de rastreio será atualizado em algumas horas. Se estiver usando dados móveis e a busca falhar, verifique se o "Modo de Economia" está ativo no seu celular.
                             </p>
                         </div>
                     </div>
@@ -149,13 +151,9 @@
 
         function formatData(dataString) {
             if (!dataString) return '-';
-            if (dataString.match(/^\d{2}\/\d{2}\/\d{4}/)) return dataString;
-
             const date = new Date(dataString);
             if (!isNaN(date.getTime())) {
-                return date.toLocaleDateString('pt-BR', {
-                    day: '2-digit', month: '2-digit', year: 'numeric'
-                });
+                return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
             }
             return dataString;
         }
@@ -163,9 +161,7 @@
         function showMessage(msg, type = 'info') {
             statusMessage.textContent = msg;
             statusContainer.classList.remove('hidden');
-            
-            // Limpa classes anteriores
-            statusMessage.className = "text-center text-sm font-medium py-2 px-6 rounded-lg shadow-sm border";
+            statusMessage.className = "text-center text-sm font-medium py-3 px-6 rounded-lg shadow-sm border leading-relaxed";
             
             if (type === 'error') {
                 statusMessage.classList.add('text-red-700', 'bg-red-50', 'border-red-100');
@@ -178,8 +174,6 @@
 
         async function handleSearch() {
             let query = orderInput.value.trim();
-            
-            // Limpeza inteligente: Remove "Pedido", "#", "." e espaços
             query = query.replace(/(pedido|#|\.)/gi, '').trim();
 
             if (!query) {
@@ -187,24 +181,27 @@
                 return;
             }
 
-            // UI State - Início da busca
             searchButton.disabled = true;
             searchButton.innerHTML = `<div class="loader"></div>`;
             resultsContainer.innerHTML = '';
             statusContainer.classList.add('hidden');
 
-            // Timeout de 15 segundos para a requisição
+            // Timeout aumentado para 30s devido aos dados móveis
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
 
             try {
-                const response = await fetch(`${SCRIPT_URL}?pedido=${encodeURIComponent(query)}`, {
+                // Parâmetros extras para evitar cache e garantir redirecionamento mobile
+                const response = await fetch(`${SCRIPT_URL}?pedido=${encodeURIComponent(query)}&t=${Date.now()}`, {
+                    method: 'GET',
+                    mode: 'cors',
+                    credentials: 'omit',
                     signal: controller.signal
                 });
                 
                 clearTimeout(timeoutId);
 
-                if (!response.ok) throw new Error('Network response was not ok');
+                if (!response.ok) throw new Error('Falha na resposta');
                 
                 const data = await response.json();
                 displayResults(data, query);
@@ -212,9 +209,9 @@
             } catch (error) {
                 console.error('Fetch error:', error);
                 if (error.name === 'AbortError') {
-                    showMessage('A busca demorou muito. Verifique sua conexão ou tente novamente.', 'error');
+                    showMessage('A conexão está lenta. Tente se aproximar de uma janela ou use o Wi-Fi.', 'error');
                 } else {
-                    showMessage('Não foi possível conectar ao servidor. Se você está em uma rede corporativa, verifique se há bloqueios ao Google Scripts.', 'error');
+                    showMessage('Erro de conexão. Se estiver em dados móveis, desative o "Modo de Economia" ou tente novamente em instantes.', 'error');
                 }
             } finally {
                 searchButton.disabled = false;
@@ -233,62 +230,53 @@
                 const dataLib = formatData(order.dataLiberacao);
                 const rastreio = (order.codigoRastreio || '').trim();
                 const isPendente = !rastreio || rastreio.toLowerCase() === 'pendente';
-                const servico = order.servico || 'Normal';
-                
                 const hasTracking = !isPendente && rastreio.length > 5;
-
-                let statusText = hasTracking ? 'Objeto Postado' : 'Aguardando Coleta';
-                let statusIcon = hasTracking ? icons.box : '...';
-                let statusColorClass = hasTracking ? 'text-blue-600 bg-blue-100 border-blue-200' : 'text-slate-400 bg-slate-200 border-slate-200';
-
                 const numPedido = String(order.numeroPedido);
-                let titleSizeClass = numPedido.length > 15 ? 'text-xl' : (numPedido.length > 8 ? 'text-2xl' : 'text-3xl');
 
                 const cardHTML = `
-                    <div class="relative overflow-hidden bg-white rounded-2xl shadow-xl border border-slate-100 transform transition-all duration-300">
+                    <div class="relative overflow-hidden bg-white rounded-2xl shadow-xl border border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div class="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-blue-500 to-blue-700"></div>
                         <div class="p-6 md:p-8 ml-2">
-                            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                                <div class="w-full">
-                                    <span class="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1 block">Número do Pedido</span>
-                                    <h2 class="${titleSizeClass} font-extrabold text-slate-800 break-words">#${numPedido}</h2>
-                                    <p class="text-slate-500 font-medium mt-1 text-sm truncate" title="${remetente}">${remetente}</p>
+                            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3">
+                                <div>
+                                    <span class="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1 block">Número do Pedido</span>
+                                    <h2 class="text-2xl font-extrabold text-slate-800">#${numPedido}</h2>
+                                    <p class="text-slate-500 font-medium text-xs mt-0.5 truncate max-w-[250px]">${remetente}</p>
                                 </div>
-                                <span class="px-4 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-bold uppercase border border-blue-100">
-                                    ${servico}
+                                <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase border border-blue-100">
+                                    ${order.servico || 'Normal'}
                                 </span>
                             </div>
 
-                            <div class="flex items-center gap-4 mb-8 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 bg-slate-50 p-4 rounded-xl border border-slate-100">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center border border-green-200">
+                                    <div class="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center border border-green-200 shadow-sm">
                                         ${icons.check}
                                     </div>
                                     <div class="flex flex-col">
-                                        <span class="text-xs font-bold text-slate-400 uppercase">Data Liberação</span>
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase">Liberação</span>
                                         <span class="text-sm font-bold text-slate-700">${dataLib}</span>
                                     </div>
                                 </div>
-                                <div class="h-px bg-slate-200 flex-grow mx-2"></div>
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full ${statusColorClass} flex items-center justify-center border">
-                                        ${statusIcon}
+                                    <div class="w-8 h-8 rounded-full ${hasTracking ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-400'} flex items-center justify-center border shadow-sm">
+                                        ${hasTracking ? icons.box : '...'}
                                     </div>
                                     <div class="flex flex-col">
-                                        <span class="text-xs font-bold text-slate-400 uppercase">Situação</span>
-                                        <span class="text-sm font-bold ${hasTracking ? 'text-blue-600' : 'text-slate-500'}">${statusText}</span>
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase">Situação</span>
+                                        <span class="text-sm font-bold ${hasTracking ? 'text-blue-600' : 'text-slate-500'}">${hasTracking ? 'Objeto Postado' : 'Em Processamento'}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="mt-4">
-                                <label class="text-xs font-bold text-slate-400 uppercase mb-2 block">Código de Rastreio</label>
-                                <div class="flex flex-col sm:flex-row gap-3">
-                                    <div class="flex-grow bg-slate-100 p-4 rounded-xl font-mono text-xl text-slate-700 border border-slate-200 flex items-center justify-between">
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase mb-2 block">Código de Rastreio</label>
+                                <div class="flex flex-col gap-3">
+                                    <div class="bg-slate-100 p-4 rounded-xl font-mono text-lg text-slate-700 border border-slate-200 flex items-center justify-between">
                                         <span class="select-all tracking-wider font-bold">${isPendente ? 'Pendente' : rastreio}</span>
                                         ${hasTracking ? `
                                             <button onclick="copyToClipboard('${rastreio}', this)" 
-                                                class="ml-2 p-2 hover:bg-white rounded-lg transition-colors text-slate-400 hover:text-blue-600" title="Copiar">
+                                                class="p-2 hover:bg-white rounded-lg transition-colors text-slate-400 hover:text-blue-600">
                                                 ${icons.copy}
                                             </button>
                                         ` : ''}
@@ -297,14 +285,14 @@
                                     ${hasTracking ? `
                                         <a href="https://rastreamento.correios.com.br/app/index.php?objetos=${rastreio}" 
                                             target="_blank"
-                                            class="bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2">
-                                            <span>Rastrear</span>
+                                            class="bg-green-600 hover:bg-green-700 text-white w-full py-4 rounded-xl font-bold transition-all shadow-md flex items-center justify-center gap-2">
+                                            <span>Rastrear Agora</span>
                                             ${icons.external}
                                         </a>
                                     ` : `
-                                        <button disabled class="bg-slate-200 text-slate-400 px-6 py-4 rounded-xl font-bold cursor-not-allowed">
-                                            Aguardando...
-                                        </button>
+                                        <div class="text-center py-3 text-xs text-slate-400 font-medium italic">
+                                            Aguardando coleta da transportadora...
+                                        </div>
                                     `}
                                 </div>
                             </div>
@@ -315,26 +303,21 @@
             });
         }
 
-        // Função de cópia compatível com iFrames e navegadores móveis
         window.copyToClipboard = function(text, btnElement) {
             const tempInput = document.createElement('input');
             tempInput.value = text;
             document.body.appendChild(tempInput);
             tempInput.select();
-            
             try {
                 document.execCommand('copy');
                 const originalContent = btnElement.innerHTML;
                 btnElement.innerHTML = icons.check;
                 btnElement.classList.add('text-green-600');
-                
                 setTimeout(() => {
                     btnElement.innerHTML = originalContent;
                     btnElement.classList.remove('text-green-600');
                 }, 2000);
-            } catch (err) {
-                console.error('Fallback copy failed', err);
-            }
+            } catch (err) {}
             document.body.removeChild(tempInput);
         }
 
@@ -345,7 +328,6 @@
     </script>
 </body>
 </html>
-
 
 
 
