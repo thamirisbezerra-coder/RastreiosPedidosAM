@@ -37,10 +37,8 @@
             background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
         }
 
-        /* Melhoria de legibilidade no mobile */
         @media screen and (max-width: 768px) {
             input { font-size: 16px !important; }
-            .card-padding { padding: 1.5rem !important; }
         }
     </style>
 </head>
@@ -49,7 +47,7 @@
     <!-- Container Principal -->
     <div class="w-full max-w-4xl bg-white shadow-2xl rounded-3xl overflow-hidden border border-gray-100">
         
-        <div class="p-6 md:p-12 space-y-8 md:y-10">
+        <div class="p-6 md:p-12 space-y-8">
             
             <!-- ÁREA DA LOGO -->
             <div class="flex justify-center">
@@ -57,14 +55,13 @@
                     src="https://i.postimg.cc/76mXWMJh/as-02.png" 
                     alt="Logo Doremus" 
                     class="h-20 md:h-28 object-contain transition-transform duration-500 hover:scale-105"
-                    onerror="this.src='https://via.placeholder.com/200x80?text=Doremus'"
                 >
             </div>
 
             <!-- Cabeçalho de Texto -->
             <div class="text-center space-y-3">
-                <h1 class="text-2xl md:text-4xl font-extrabold text-slate-900 tracking-tight px-2">Rastreamento de Amostras</h1>
-                <p class="text-slate-500 text-base md:text-lg">Consulte o status do seu pedido em tempo real</p>
+                <h1 class="text-2xl md:text-4xl font-extrabold text-slate-900 tracking-tight">Rastreamento de Amostras</h1>
+                <p class="text-slate-500 text-base md:text-lg">Consulte o status do seu pedido</p>
             </div>
 
             <!-- Área de Busca -->
@@ -90,9 +87,9 @@
                 </button>
             </div>
 
-            <!-- Mensagens de Status -->
+            <!-- Mensagem de Status -->
             <div id="statusContainer" class="hidden mx-auto max-w-lg px-4">
-                <p id="statusMessage" class="text-center text-sm font-medium py-3 px-6 rounded-lg shadow-sm border leading-relaxed"></p>
+                <p id="statusMessage" class="text-center text-sm font-medium py-3 px-6 rounded-lg border shadow-sm"></p>
             </div>
 
             <!-- Container de Resultados -->
@@ -100,7 +97,7 @@
                 <!-- Cards aparecem aqui -->
             </div>
 
-            <!-- Observação Importante -->
+            <!-- Quadro de Aviso Importante -->
             <div class="bg-amber-50 border-l-4 border-amber-400 p-6 rounded-r-xl shadow-sm">
                 <div class="flex items-start">
                     <div class="flex-shrink-0 mt-0.5">
@@ -114,7 +111,7 @@
                         </h3>
                         <div class="mt-2 text-sm text-amber-700 leading-relaxed text-justify">
                             <p>
-                                Após a liberação do seu pedido, o código de rastreio será atualizado em algumas horas. Se estiver usando dados móveis e a busca falhar, verifique se o "Modo de Economia" está ativo no seu celular.
+                                Se você recebeu o workflow de faturamento e o pedido ainda não estiver disponível para consulta, por favor aguarde até o final do dia. As informações de rastreio serão atualizadas por nossa equipe logo após o fechamento dos Correios.
                             </p>
                         </div>
                     </div>
@@ -152,21 +149,17 @@
         function formatData(dataString) {
             if (!dataString) return '-';
             const date = new Date(dataString);
-            if (!isNaN(date.getTime())) {
-                return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            }
-            return dataString;
+            return !isNaN(date.getTime()) 
+                ? date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                : dataString;
         }
 
-        function showMessage(msg, type = 'info') {
+        function showStatus(msg, type = 'info') {
             statusMessage.textContent = msg;
             statusContainer.classList.remove('hidden');
-            statusMessage.className = "text-center text-sm font-medium py-3 px-6 rounded-lg shadow-sm border leading-relaxed";
-            
+            statusMessage.className = "text-center text-sm font-medium py-3 px-6 rounded-lg border shadow-sm";
             if (type === 'error') {
                 statusMessage.classList.add('text-red-700', 'bg-red-50', 'border-red-100');
-            } else if (type === 'warning') {
-                statusMessage.classList.add('text-amber-700', 'bg-amber-50', 'border-amber-100');
             } else {
                 statusMessage.classList.add('text-slate-600', 'bg-slate-50', 'border-slate-100');
             }
@@ -176,125 +169,108 @@
             let query = orderInput.value.trim();
             query = query.replace(/(pedido|#|\.)/gi, '').trim();
 
-            if (!query) {
-                showMessage('Por favor, digite o número do pedido.', 'warning');
-                return;
-            }
+            if (!query) return;
 
             searchButton.disabled = true;
             searchButton.innerHTML = `<div class="loader"></div>`;
             resultsContainer.innerHTML = '';
             statusContainer.classList.add('hidden');
 
-            // Timeout aumentado para 30s devido aos dados móveis
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
+            const MAX_RETRIES = 3;
+            let attempt = 0;
+            let success = false;
 
-            try {
-                // Parâmetros extras para evitar cache e garantir redirecionamento mobile
-                const response = await fetch(`${SCRIPT_URL}?pedido=${encodeURIComponent(query)}&t=${Date.now()}`, {
-                    method: 'GET',
-                    mode: 'cors',
-                    credentials: 'omit',
-                    signal: controller.signal
-                });
-                
-                clearTimeout(timeoutId);
+            while (attempt < MAX_RETRIES && !success) {
+                try {
+                    const response = await fetch(`${SCRIPT_URL}?pedido=${encodeURIComponent(query)}&cache=${Date.now()}`, {
+                        method: 'GET',
+                        mode: 'cors'
+                    });
 
-                if (!response.ok) throw new Error('Falha na resposta');
-                
-                const data = await response.json();
-                displayResults(data, query);
+                    if (!response.ok) throw new Error();
+                    
+                    const data = await response.json();
+                    displayResults(data, query);
+                    success = true;
 
-            } catch (error) {
-                console.error('Fetch error:', error);
-                if (error.name === 'AbortError') {
-                    showMessage('A conexão está lenta. Tente se aproximar de uma janela ou use o Wi-Fi.', 'error');
-                } else {
-                    showMessage('Erro de conexão. Se estiver em dados móveis, desative o "Modo de Economia" ou tente novamente em instantes.', 'error');
+                } catch (error) {
+                    attempt++;
+                    if (attempt === MAX_RETRIES) {
+                        showStatus('Não foi possível carregar os dados. Verifique sua conexão e tente novamente.', 'error');
+                    } else {
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
                 }
-            } finally {
-                searchButton.disabled = false;
-                searchButton.textContent = 'Buscar';
             }
+
+            searchButton.disabled = false;
+            searchButton.textContent = 'Buscar';
         }
 
-        function displayResults(orders, originalQuery) {
+        function displayResults(orders, query) {
             if (!orders || orders.length === 0) {
-                showMessage(`Nenhum registro encontrado para o pedido "${originalQuery}".`, 'warning');
+                showStatus(`Nenhum registro encontrado para #${query}.`, 'info');
                 return;
             }
 
             orders.forEach(order => {
-                const remetente = order.remetente || 'Cliente';
-                const dataLib = formatData(order.dataLiberacao);
                 const rastreio = (order.codigoRastreio || '').trim();
                 const isPendente = !rastreio || rastreio.toLowerCase() === 'pendente';
                 const hasTracking = !isPendente && rastreio.length > 5;
-                const numPedido = String(order.numeroPedido);
 
                 const cardHTML = `
-                    <div class="relative overflow-hidden bg-white rounded-2xl shadow-xl border border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div class="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-blue-500 to-blue-700"></div>
+                    <div class="relative overflow-hidden bg-white rounded-2xl shadow-xl border border-slate-100 animate-in fade-in duration-500">
+                        <div class="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
                         <div class="p-6 md:p-8 ml-2">
                             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3">
                                 <div>
-                                    <span class="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1 block">Número do Pedido</span>
-                                    <h2 class="text-2xl font-extrabold text-slate-800">#${numPedido}</h2>
-                                    <p class="text-slate-500 font-medium text-xs mt-0.5 truncate max-w-[250px]">${remetente}</p>
+                                    <span class="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1 block">Pedido</span>
+                                    <h2 class="text-2xl font-extrabold text-slate-800">#${order.numeroPedido}</h2>
+                                    <p class="text-slate-500 font-medium text-xs truncate max-w-[200px]">${order.remetente || 'Cliente'}</p>
                                 </div>
                                 <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase border border-blue-100">
                                     ${order.servico || 'Normal'}
                                 </span>
                             </div>
 
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <div class="grid grid-cols-2 gap-4 mb-8 bg-slate-50 p-4 rounded-xl border border-slate-100">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center border border-green-200 shadow-sm">
+                                    <div class="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
                                         ${icons.check}
                                     </div>
                                     <div class="flex flex-col">
-                                        <span class="text-[10px] font-bold text-slate-400 uppercase">Liberação</span>
-                                        <span class="text-sm font-bold text-slate-700">${dataLib}</span>
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase">Data</span>
+                                        <span class="text-sm font-bold text-slate-700">${formatData(order.dataLiberacao)}</span>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full ${hasTracking ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-400'} flex items-center justify-center border shadow-sm">
+                                    <div class="w-8 h-8 rounded-full ${hasTracking ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-400'} flex items-center justify-center">
                                         ${hasTracking ? icons.box : '...'}
                                     </div>
                                     <div class="flex flex-col">
-                                        <span class="text-[10px] font-bold text-slate-400 uppercase">Situação</span>
-                                        <span class="text-sm font-bold ${hasTracking ? 'text-blue-600' : 'text-slate-500'}">${hasTracking ? 'Objeto Postado' : 'Em Processamento'}</span>
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase">Status</span>
+                                        <span class="text-sm font-bold ${hasTracking ? 'text-blue-600' : 'text-slate-500'}">${hasTracking ? 'Postado' : 'Processando'}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div>
-                                <label class="text-[10px] font-bold text-slate-400 uppercase mb-2 block">Código de Rastreio</label>
-                                <div class="flex flex-col gap-3">
-                                    <div class="bg-slate-100 p-4 rounded-xl font-mono text-lg text-slate-700 border border-slate-200 flex items-center justify-between">
-                                        <span class="select-all tracking-wider font-bold">${isPendente ? 'Pendente' : rastreio}</span>
-                                        ${hasTracking ? `
-                                            <button onclick="copyToClipboard('${rastreio}', this)" 
-                                                class="p-2 hover:bg-white rounded-lg transition-colors text-slate-400 hover:text-blue-600">
-                                                ${icons.copy}
-                                            </button>
-                                        ` : ''}
-                                    </div>
-                                    
+                            <div class="flex flex-col gap-3">
+                                <div class="bg-slate-100 p-4 rounded-xl font-mono text-lg text-slate-700 border border-slate-200 flex items-center justify-between">
+                                    <span class="tracking-wider font-bold">${isPendente ? 'Aguardando Código' : rastreio}</span>
                                     ${hasTracking ? `
-                                        <a href="https://rastreamento.correios.com.br/app/index.php?objetos=${rastreio}" 
-                                            target="_blank"
-                                            class="bg-green-600 hover:bg-green-700 text-white w-full py-4 rounded-xl font-bold transition-all shadow-md flex items-center justify-center gap-2">
-                                            <span>Rastrear Agora</span>
-                                            ${icons.external}
-                                        </a>
-                                    ` : `
-                                        <div class="text-center py-3 text-xs text-slate-400 font-medium italic">
-                                            Aguardando coleta da transportadora...
-                                        </div>
-                                    `}
+                                        <button onclick="copyToClipboard('${rastreio}', this)" class="p-2 text-slate-400 hover:text-blue-600">
+                                            ${icons.copy}
+                                        </button>
+                                    ` : ''}
                                 </div>
+                                ${hasTracking ? `
+                                    <a href="https://rastreamento.correios.com.br/app/index.php?objetos=${rastreio}" 
+                                        target="_blank"
+                                        class="bg-green-600 hover:bg-green-700 text-white w-full py-4 rounded-xl font-bold transition-all shadow-md flex items-center justify-center gap-2">
+                                        <span>Rastrear Agora</span>
+                                        ${icons.external}
+                                    </a>
+                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -304,27 +280,19 @@
         }
 
         window.copyToClipboard = function(text, btnElement) {
-            const tempInput = document.createElement('input');
-            tempInput.value = text;
-            document.body.appendChild(tempInput);
-            tempInput.select();
-            try {
-                document.execCommand('copy');
-                const originalContent = btnElement.innerHTML;
-                btnElement.innerHTML = icons.check;
-                btnElement.classList.add('text-green-600');
-                setTimeout(() => {
-                    btnElement.innerHTML = originalContent;
-                    btnElement.classList.remove('text-green-600');
-                }, 2000);
-            } catch (err) {}
-            document.body.removeChild(tempInput);
+            const el = document.createElement('textarea');
+            el.value = text;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            const original = btnElement.innerHTML;
+            btnElement.innerHTML = icons.check;
+            setTimeout(() => btnElement.innerHTML = original, 2000);
         }
 
         searchButton.addEventListener('click', handleSearch);
-        orderInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') handleSearch();
-        });
+        orderInput.addEventListener('keydown', (e) => e.key === 'Enter' && handleSearch());
     </script>
 </body>
 </html>
