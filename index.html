@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Rastreamentos de Pedidos AM</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -17,15 +17,16 @@
             background-color: #f8fafc;
             background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
             background-size: 24px 24px;
+            -webkit-tap-highlight-color: transparent;
         }
         
         .loader {
             border: 3px solid rgba(255,255,255,0.3);
             border-radius: 50%;
             border-top: 3px solid #ffffff;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
+            width: 22px;
+            height: 22px;
+            animation: spin 0.8s linear infinite;
         }
         
         @keyframes spin {
@@ -37,12 +38,17 @@
             background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
         }
 
+        input:focus {
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+
+        /* Prevenção de zoom automático no iOS */
         @media screen and (max-width: 768px) {
-            input { font-size: 16px !important; }
+            input, select, textarea { font-size: 16px !important; }
         }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4">
+<body class="min-h-screen flex flex-col items-center justify-start md:justify-center p-4 pt-8 md:p-4">
 
     <!-- Container Principal -->
     <div class="w-full max-w-4xl bg-white shadow-2xl rounded-3xl overflow-hidden border border-gray-100">
@@ -59,13 +65,13 @@
             </div>
 
             <!-- Cabeçalho de Texto -->
-            <div class="text-center space-y-3">
+            <div class="text-center space-y-2">
                 <h1 class="text-2xl md:text-4xl font-extrabold text-slate-900 tracking-tight">Rastreamento de Amostras</h1>
-                <p class="text-slate-500 text-base md:text-lg">Consulte o status do seu pedido</p>
+                <p class="text-slate-500 text-sm md:text-lg font-medium">Consulte o status do seu pedido em tempo real</p>
             </div>
 
             <!-- Área de Busca -->
-            <div class="bg-white rounded-2xl p-2 shadow-lg border border-gray-200 flex flex-col md:flex-row gap-2 max-w-2xl mx-auto transition-shadow hover:shadow-xl focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-opacity-50">
+            <div class="bg-white rounded-2xl p-2 shadow-lg border border-gray-200 flex flex-col md:flex-row gap-2 max-w-2xl mx-auto transition-all focus-within:border-blue-400">
                 <div class="relative flex-grow">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
@@ -74,7 +80,7 @@
                         type="text" 
                         id="orderNumberInput" 
                         placeholder="Número do pedido..." 
-                        class="block w-full pl-12 pr-4 py-4 rounded-xl leading-5 bg-transparent placeholder-gray-400 focus:outline-none text-lg md:text-xl text-gray-800"
+                        class="block w-full pl-12 pr-4 py-4 rounded-xl leading-5 bg-transparent placeholder-gray-400 focus:outline-none text-lg text-gray-800"
                         autocomplete="off"
                         inputmode="numeric"
                     >
@@ -87,9 +93,9 @@
                 </button>
             </div>
 
-            <!-- Mensagem de Status -->
+            <!-- Mensagem de Status (Invisível por padrão) -->
             <div id="statusContainer" class="hidden mx-auto max-w-lg px-4">
-                <p id="statusMessage" class="text-center text-sm font-medium py-3 px-6 rounded-lg border shadow-sm"></p>
+                <p id="statusMessage" class="text-center text-sm font-semibold py-3 px-6 rounded-lg border"></p>
             </div>
 
             <!-- Container de Resultados -->
@@ -98,18 +104,18 @@
             </div>
 
             <!-- Quadro de Aviso Importante -->
-            <div class="bg-amber-50 border-l-4 border-amber-400 p-6 rounded-r-xl shadow-sm">
+            <div class="bg-amber-50 border-l-4 border-amber-400 p-5 md:p-6 rounded-r-xl shadow-sm">
                 <div class="flex items-start">
                     <div class="flex-shrink-0 mt-0.5">
                         <svg class="h-6 w-6 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
                         </svg>
                     </div>
-                    <div class="ml-4">
-                        <h3 class="text-base font-bold text-amber-800">
+                    <div class="ml-3 md:ml-4">
+                        <h3 class="text-sm md:text-base font-bold text-amber-800 uppercase tracking-tight">
                             Atenção ao prazo de atualização
                         </h3>
-                        <div class="mt-2 text-sm text-amber-700 leading-relaxed text-justify">
+                        <div class="mt-2 text-xs md:text-sm text-amber-700 leading-relaxed">
                             <p>
                                 Se você recebeu o workflow de faturamento e o pedido ainda não estiver disponível para consulta, por favor aguarde até o final do dia. As informações de rastreio serão atualizadas por nossa equipe logo após o fechamento dos Correios.
                             </p>
@@ -120,17 +126,18 @@
 
             <!-- Rodapé -->
             <div class="text-center pt-8 border-t border-gray-100">
-                <p class="text-slate-600 mb-2">Dúvidas? Entre em contato:</p>
-                <a href="mailto:amostras@doremus.com.br" class="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-bold bg-blue-50 px-4 py-2 rounded-full transition-colors">
+                <p class="text-slate-500 text-sm mb-3">Dúvidas? Entre em contato:</p>
+                <a href="mailto:amostras@doremus.com.br" class="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-bold bg-blue-50 px-5 py-2.5 rounded-full transition-colors border border-blue-100 shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                     amostras@doremus.com.br
                 </a>
-                <p class="text-slate-400 text-xs mt-6">© 2025 Doremus. Todos os direitos reservados.</p>
+                <p class="text-slate-400 text-[10px] mt-8 uppercase tracking-widest font-semibold">© 2025 Doremus. Todos os direitos reservados.</p>
             </div>
         </div>
     </div>
 
     <script>
+        // URL DIRETA (Google Apps Script)
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyIFhZvICOXRJxDHAI9_RHRdBdvnmYL-7gO5NgF42IY7R_GZKDyVwCl-9kjUGXHBmi2/exec'; 
 
         const searchButton = document.getElementById('searchButton');
@@ -140,7 +147,7 @@
         const statusMessage = document.getElementById('statusMessage');
 
         const icons = {
-            check: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
+            check: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
             copy: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`,
             external: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`,
             box: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>`
@@ -157,7 +164,8 @@
         function showStatus(msg, type = 'info') {
             statusMessage.textContent = msg;
             statusContainer.classList.remove('hidden');
-            statusMessage.className = "text-center text-sm font-medium py-3 px-6 rounded-lg border shadow-sm";
+            statusMessage.className = "text-center text-sm font-semibold py-3 px-6 rounded-lg border shadow-sm animate-pulse";
+            
             if (type === 'error') {
                 statusMessage.classList.add('text-red-700', 'bg-red-50', 'border-red-100');
             } else {
@@ -171,6 +179,7 @@
 
             if (!query) return;
 
+            // Bloqueia UI
             searchButton.disabled = true;
             searchButton.innerHTML = `<div class="loader"></div>`;
             resultsContainer.innerHTML = '';
@@ -182,12 +191,17 @@
 
             while (attempt < MAX_RETRIES && !success) {
                 try {
-                    const response = await fetch(`${SCRIPT_URL}?pedido=${encodeURIComponent(query)}&cache=${Date.now()}`, {
+                    // Técnica para bypass de proxy mobile: URL limpa + redirect follow + cache omit
+                    const fetchUrl = `${SCRIPT_URL}?pedido=${encodeURIComponent(query)}&_t=${Date.now()}`;
+                    
+                    const response = await fetch(fetchUrl, {
                         method: 'GET',
-                        mode: 'cors'
+                        cache: 'no-store',
+                        redirect: 'follow',
+                        referrerPolicy: 'no-referrer'
                     });
 
-                    if (!response.ok) throw new Error();
+                    if (!response.ok) throw new Error('Network error');
                     
                     const data = await response.json();
                     displayResults(data, query);
@@ -195,21 +209,24 @@
 
                 } catch (error) {
                     attempt++;
+                    console.log(`Tentativa ${attempt} falhou...`);
                     if (attempt === MAX_RETRIES) {
-                        showStatus('Não foi possível carregar os dados. Verifique sua conexão e tente novamente.', 'error');
+                        showStatus('Problema na conexão. Se estiver em 4G, tente reiniciar os dados móveis ou tente em Wi-Fi.', 'error');
                     } else {
-                        await new Promise(r => setTimeout(r, 1000));
+                        // Espera curta antes de tentar novamente (crucial para 4G instável)
+                        await new Promise(r => setTimeout(r, 1500));
                     }
                 }
             }
 
             searchButton.disabled = false;
             searchButton.textContent = 'Buscar';
+            statusMessage.classList.remove('animate-pulse');
         }
 
         function displayResults(orders, query) {
             if (!orders || orders.length === 0) {
-                showStatus(`Nenhum registro encontrado para #${query}.`, 'info');
+                showStatus(`Pedido #${query} não localizado no sistema.`, 'info');
                 return;
             }
 
@@ -219,46 +236,47 @@
                 const hasTracking = !isPendente && rastreio.length > 5;
 
                 const cardHTML = `
-                    <div class="relative overflow-hidden bg-white rounded-2xl shadow-xl border border-slate-100 animate-in fade-in duration-500">
+                    <div class="relative overflow-hidden bg-white rounded-2xl shadow-xl border border-slate-100 animate-in fade-in slide-in-from-bottom-2 duration-500">
                         <div class="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
                         <div class="p-6 md:p-8 ml-2">
                             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3">
                                 <div>
-                                    <span class="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1 block">Pedido</span>
-                                    <h2 class="text-2xl font-extrabold text-slate-800">#${order.numeroPedido}</h2>
-                                    <p class="text-slate-500 font-medium text-xs truncate max-w-[200px]">${order.remetente || 'Cliente'}</p>
+                                    <span class="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1 block">Número do Pedido</span>
+                                    <h2 class="text-2xl font-black text-slate-800 tracking-tight">#${order.numeroPedido}</h2>
+                                    <p class="text-slate-500 font-medium text-xs truncate max-w-[200px] mt-0.5">${order.remetente || 'Cliente'}</p>
                                 </div>
-                                <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase border border-blue-100">
+                                <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase border border-blue-100 shadow-sm">
                                     ${order.servico || 'Normal'}
                                 </span>
                             </div>
 
-                            <div class="grid grid-cols-2 gap-4 mb-8 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <div class="grid grid-cols-2 gap-3 md:gap-4 mb-8 bg-slate-50 p-4 rounded-xl border border-slate-100">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                                    <div class="w-9 h-9 rounded-full bg-green-100 text-green-600 flex items-center justify-center shadow-sm">
                                         ${icons.check}
                                     </div>
                                     <div class="flex flex-col">
-                                        <span class="text-[10px] font-bold text-slate-400 uppercase">Data</span>
-                                        <span class="text-sm font-bold text-slate-700">${formatData(order.dataLiberacao)}</span>
+                                        <span class="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">Liberação</span>
+                                        <span class="text-xs md:text-sm font-bold text-slate-700">${formatData(order.dataLiberacao)}</span>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full ${hasTracking ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-400'} flex items-center justify-center">
+                                    <div class="w-9 h-9 rounded-full ${hasTracking ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-400'} flex items-center justify-center shadow-sm">
                                         ${hasTracking ? icons.box : '...'}
                                     </div>
                                     <div class="flex flex-col">
-                                        <span class="text-[10px] font-bold text-slate-400 uppercase">Status</span>
-                                        <span class="text-sm font-bold ${hasTracking ? 'text-blue-600' : 'text-slate-500'}">${hasTracking ? 'Postado' : 'Processando'}</span>
+                                        <span class="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">Status</span>
+                                        <span class="text-xs md:text-sm font-bold ${hasTracking ? 'text-blue-600' : 'text-slate-500'}">${hasTracking ? 'Postado' : 'Aguarde...'}</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="flex flex-col gap-3">
-                                <div class="bg-slate-100 p-4 rounded-xl font-mono text-lg text-slate-700 border border-slate-200 flex items-center justify-between">
-                                    <span class="tracking-wider font-bold">${isPendente ? 'Aguardando Código' : rastreio}</span>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase px-1">Código de Rastreio</label>
+                                <div class="bg-slate-100 p-4 rounded-xl font-mono text-lg text-slate-700 border border-slate-200 flex items-center justify-between shadow-inner">
+                                    <span class="tracking-widest font-bold">${isPendente ? 'Pendente' : rastreio}</span>
                                     ${hasTracking ? `
-                                        <button onclick="copyToClipboard('${rastreio}', this)" class="p-2 text-slate-400 hover:text-blue-600">
+                                        <button onclick="copyToClipboard('${rastreio}', this)" class="p-2 text-slate-400 hover:text-blue-600 active:scale-90 transition-transform">
                                             ${icons.copy}
                                         </button>
                                     ` : ''}
@@ -266,11 +284,15 @@
                                 ${hasTracking ? `
                                     <a href="https://rastreamento.correios.com.br/app/index.php?objetos=${rastreio}" 
                                         target="_blank"
-                                        class="bg-green-600 hover:bg-green-700 text-white w-full py-4 rounded-xl font-bold transition-all shadow-md flex items-center justify-center gap-2">
-                                        <span>Rastrear Agora</span>
+                                        class="bg-green-600 hover:bg-green-700 text-white w-full py-4 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 active:scale-[0.98]">
+                                        <span>Rastrear no Site</span>
                                         ${icons.external}
                                     </a>
-                                ` : ''}
+                                ` : `
+                                    <div class="text-center py-2 text-[10px] text-slate-400 font-bold italic uppercase tracking-tighter">
+                                        Aguardando coleta física da transportadora
+                                    </div>
+                                `}
                             </div>
                         </div>
                     </div>
@@ -286,9 +308,14 @@
             el.select();
             document.execCommand('copy');
             document.body.removeChild(el);
+            
             const original = btnElement.innerHTML;
             btnElement.innerHTML = icons.check;
-            setTimeout(() => btnElement.innerHTML = original, 2000);
+            btnElement.classList.add('text-green-600');
+            setTimeout(() => {
+                btnElement.innerHTML = original;
+                btnElement.classList.remove('text-green-600');
+            }, 2000);
         }
 
         searchButton.addEventListener('click', handleSearch);
@@ -296,6 +323,7 @@
     </script>
 </body>
 </html>
+
 
 
 
