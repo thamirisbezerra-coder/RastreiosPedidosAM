@@ -98,7 +98,7 @@
 
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { getFirestore, collection, getDocs, query } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         // Inicialização do Firebase (Dados providos pelo ambiente)
@@ -113,9 +113,14 @@
         // Autenticação Silenciosa (Indispensável para Firestore)
         const initAuth = async () => {
             try {
-                await signInAnonymously(auth);
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
             } catch (e) {
                 console.error("Erro de autenticação:", e);
+                showStatus("Erro ao conectar com o servidor. Tente recarregar.", true);
             }
         };
 
@@ -123,6 +128,7 @@
             currentUser = user;
         });
 
+        // Inicia auth imediatamente
         initAuth();
 
         const searchButton = document.getElementById('searchButton');
@@ -144,8 +150,20 @@
         }
 
         async function handleSearch() {
-            if (!currentUser) {
+            // Garante autenticação antes de prosseguir
+            if (!auth.currentUser) {
                 await initAuth();
+            }
+            
+            // Verifica se realmente autenticou
+            if (!auth.currentUser) {
+                showStatus("Aguardando conexão segura...", false);
+                // Pequeno delay para dar chance da auth terminar se estiver em race condition
+                await new Promise(r => setTimeout(r, 1000));
+                if (!auth.currentUser) {
+                     showStatus("Não foi possível autenticar. Tente recarregar a página.", true);
+                     return;
+                }
             }
 
             let queryVal = orderInput.value.trim();
@@ -181,8 +199,12 @@
                 displayResults(filtered, queryVal);
 
             } catch (error) {
-                console.error(error);
-                showStatus('Erro ao carregar dados. Tente novamente em alguns instantes.', true);
+                console.error("Erro na busca:", error);
+                if (error.code === 'permission-denied') {
+                    showStatus('Erro de permissão. Recarregue a página para autenticar novamente.', true);
+                } else {
+                    showStatus('Erro ao buscar dados. Tente novamente.', true);
+                }
             } finally {
                 searchButton.disabled = false;
                 searchButton.textContent = 'Buscar';
