@@ -52,7 +52,7 @@
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     </div>
-                    <input type="text" id="orderNumberInput" placeholder="Número do pedido (ex: 478569)..." class="block w-full pl-11 pr-4 py-4 rounded-xl leading-5 bg-transparent focus:outline-none text-lg text-gray-800" autocomplete="off" inputmode="numeric">
+                    <input type="text" id="orderNumberInput" placeholder="Número do pedido (ex: 478569)..." class="block w-full pl-11 pr-4 py-4 rounded-xl leading-5 bg-transparent focus:outline-none text-lg text-gray-800" autocomplete="off" inputmode="text">
                 </div>
                 <button id="searchButton" class="btn-gradient text-white font-bold py-4 px-10 rounded-xl shadow-md flex items-center justify-center min-w-[140px] text-lg active:scale-95 transition-transform">
                     Buscar
@@ -101,7 +101,7 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { getFirestore, collection, getDocs, query } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-        // Inicialização do Firebase (Dados providos pelo ambiente)
+        // Inicialização do Firebase
         const firebaseConfig = JSON.parse(__firebase_config);
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -110,7 +110,6 @@
 
         let currentUser = null;
 
-        // Autenticação Silenciosa (Indispensável para Firestore)
         const initAuth = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -128,7 +127,6 @@
             currentUser = user;
         });
 
-        // Inicia auth imediatamente
         initAuth();
 
         const searchButton = document.getElementById('searchButton');
@@ -149,16 +147,23 @@
             statusMessage.className = `text-center text-sm font-bold py-3 px-6 rounded-xl border shadow-sm ${isError ? 'text-red-700 bg-red-50 border-red-100' : 'text-slate-600 bg-slate-50 border-slate-100'}`;
         }
 
+        // Helper para acessar campos com segurança, tentando variações de nome
+        function getField(docData, possibleKeys) {
+            for (let key of possibleKeys) {
+                if (docData[key] !== undefined && docData[key] !== null) {
+                    return docData[key];
+                }
+            }
+            return '';
+        }
+
         async function handleSearch() {
-            // Garante autenticação antes de prosseguir
             if (!auth.currentUser) {
                 await initAuth();
             }
             
-            // Verifica se realmente autenticou
             if (!auth.currentUser) {
                 showStatus("Aguardando conexão segura...", false);
-                // Pequeno delay para dar chance da auth terminar se estiver em race condition
                 await new Promise(r => setTimeout(r, 1000));
                 if (!auth.currentUser) {
                      showStatus("Não foi possível autenticar. Tente recarregar a página.", true);
@@ -166,11 +171,10 @@
                 }
             }
 
-            let queryVal = orderInput.value.trim();
-            // Remove prefixos comuns mas mantém o resto para a lógica de normalização abaixo
-            queryVal = queryVal.replace(/(pedido|#|№)/gi, '').trim();
+            let rawQuery = orderInput.value.trim().toLowerCase();
+            let normalizedQuery = rawQuery.replace(/[^a-z0-9]/g, '');
 
-            if (!queryVal) return;
+            if (!rawQuery) return;
 
             searchButton.disabled = true;
             searchButton.innerHTML = `<div class="loader"></div>`;
@@ -178,32 +182,47 @@
             statusContainer.classList.add('hidden');
 
             try {
-                // Seguindo a Regra 1: Caminho estrito
                 const ordersCol = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
                 const snapshot = await getDocs(ordersCol);
                 
                 const allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                // === LÓGICA DE BUSCA MELHORADA ===
-                // Função que remove tudo que não é letra ou número (remove /, ., -, espaços)
-                // Isso permite que "478569" encontre "478569/1387" ou "478.569-01"
+                // === DIAGNÓSTICO: BANCO VAZIO ===
+                if (allOrders.length === 0) {
+                    console.warn("A coleção 'orders' está vazia no Firestore.");
+                    showStatus("Nenhum dado encontrado no sistema. Se você acabou de importar a planilha, verifique se a sincronização foi concluída.", true);
+                    return;
+                }
+
+                // DEBUG: Mostra o primeiro item para entender a estrutura dos campos
+                console.log("Exemplo de pedido no banco:", allOrders[0]);
+
                 const normalize = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                 
-                const searchNormalized = normalize(queryVal);
-
                 const filtered = allOrders.filter(o => {
-                    const dbNormalized = normalize(o.numeroPedido);
-                    return dbNormalized.includes(searchNormalized);
+                    // Tenta encontrar o número do pedido em vários campos possíveis
+                    const orderNumVal = getField(o, ['numeroPedido', 'NumeroPedido', 'pedido', 'Pedido', 'order', 'Order', 'numero_pedido']);
+                    const trackingVal = getField(o, ['codigoRastreio', 'CodigoRastreio', 'rastreio', 'Rastreio', 'tracking', 'Tracking']);
+                    const senderVal = getField(o, ['remetente', 'Remetente', 'cliente', 'Cliente', 'sender']);
+
+                    const orderNum = normalize(orderNumVal);
+                    const tracking = normalize(trackingVal);
+                    const sender = String(senderVal).toLowerCase();
+                    
+                    // A lógica .includes permite que "478569" encontre "4785691387" (que seria "478569/1387" normalizado)
+                    return orderNum.includes(normalizedQuery) || 
+                           tracking.includes(normalizedQuery) ||
+                           sender.includes(rawQuery);
                 });
 
-                displayResults(filtered, queryVal);
+                displayResults(filtered, orderInput.value);
 
             } catch (error) {
-                console.error("Erro na busca:", error);
+                console.error("Erro detalhado na busca:", error);
                 if (error.code === 'permission-denied') {
-                    showStatus('Erro de permissão. Recarregue a página para autenticar novamente.', true);
+                    showStatus('Acesso negado. Tente recarregar a página.', true);
                 } else {
-                    showStatus('Erro ao buscar dados. Tente novamente.', true);
+                    showStatus(`Erro ao buscar: ${error.message}`, true);
                 }
             } finally {
                 searchButton.disabled = false;
@@ -213,12 +232,19 @@
 
         function displayResults(orders, query) {
             if (orders.length === 0) {
-                showStatus(`Nenhum pedido encontrado para "${query}".`, false);
+                showStatus(`Nenhum pedido encontrado para "${query}". Verifique se o número está correto.`, false);
                 return;
             }
 
             orders.forEach(order => {
-                const rastreio = (order.codigoRastreio || '').trim();
+                // Usa o helper também na exibição para garantir que mostre algo mesmo se o nome do campo mudar
+                const numPedido = getField(order, ['numeroPedido', 'NumeroPedido', 'pedido', 'Pedido']) || 'N/A';
+                const remetente = getField(order, ['remetente', 'Remetente', 'cliente']) || 'Cliente';
+                const servico = getField(order, ['servico', 'Servico', 'service']) || 'Padrão';
+                const dataLib = getField(order, ['dataLiberacao', 'DataLiberacao', 'data']) || '-';
+                const rastreioRaw = getField(order, ['codigoRastreio', 'CodigoRastreio', 'rastreio']);
+
+                const rastreio = String(rastreioRaw || '').trim();
                 const hasTracking = rastreio && rastreio.toLowerCase() !== 'pendente' && rastreio.length > 5;
 
                 const cardHTML = `
@@ -228,11 +254,11 @@
                             <div class="flex justify-between items-start mb-6">
                                 <div>
                                     <span class="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1 block">Pedido</span>
-                                    <h2 class="text-3xl font-black text-slate-800 tracking-tighter">#${order.numeroPedido}</h2>
-                                    <p class="text-slate-500 font-bold text-xs mt-1 truncate max-w-[200px]">${order.remetente || 'Cliente'}</p>
+                                    <h2 class="text-3xl font-black text-slate-800 tracking-tighter">#${numPedido}</h2>
+                                    <p class="text-slate-500 font-bold text-xs mt-1 truncate max-w-[200px]">${remetente}</p>
                                 </div>
                                 <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase border border-blue-100">
-                                    ${order.servico || 'Padrão'}
+                                    ${servico}
                                 </span>
                             </div>
 
@@ -243,7 +269,7 @@
                                     </div>
                                     <div class="flex flex-col">
                                         <span class="text-[9px] font-bold text-slate-400 uppercase">Data</span>
-                                        <span class="text-xs font-bold text-slate-700">${order.dataLiberacao || '-'}</span>
+                                        <span class="text-xs font-bold text-slate-700">${dataLib}</span>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-3">
@@ -304,6 +330,7 @@
     </script>
 </body>
 </html>
+
 
 
 
