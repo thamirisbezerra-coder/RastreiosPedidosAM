@@ -57,6 +57,7 @@
                     </div>
                     <input type="text" id="orderNumberInput" placeholder="Número do pedido (ex: 478569)..." class="block w-full pl-11 pr-4 py-4 rounded-xl leading-5 bg-transparent focus:outline-none text-lg text-gray-800" autocomplete="off" inputmode="text">
                 </div>
+                <!-- O botão agora chama a função global window.handleSearch -->
                 <button id="searchButton" type="button" onclick="window.handleSearch && window.handleSearch()" class="btn-gradient text-white font-bold py-4 px-10 rounded-xl shadow-md flex items-center justify-center min-w-[140px] text-lg active:scale-95 transition-transform">
                     Buscar
                 </button>
@@ -110,70 +111,14 @@
     </script>
 
     <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { getFirestore, collection, getDocs, query } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
-
-        let app, auth, db, appId;
-
-        // === CONFIGURAÇÃO DO FIREBASE ===
-        try {
-            let config;
-            // 1. Tenta pegar do ambiente (se estiver no editor)
-            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-                config = JSON.parse(__firebase_config);
-            } else {
-                // 2. Fallback para a configuração manual fornecida
-                config = {
-                    apiKey: "AIzaSyA9mHfjnzFCuvZgXFg3Mp6rpQDJJwUdKGc",
-                    authDomain: "portalrastreamento.firebaseapp.com",
-                    projectId: "portalrastreamento",
-                    storageBucket: "portalrastreamento.firebasestorage.app",
-                    messagingSenderId: "433804439404",
-                    appId: "1:433804439404:web:2af4693cc66e502d248d49",
-                    measurementId: "G-SZTTQJJ0S3"
-                };
-            }
-
-            app = initializeApp(config);
-            auth = getAuth(app);
-            db = getFirestore(app);
-            
-            // IMPORTANTE: O appId no banco deve bater com o das regras de segurança
-            // Se __app_id não existir, usa 'portalrastreamento' conforme suas regras
-            appId = typeof __app_id !== 'undefined' ? __app_id : 'portalrastreamento';
-            
-            console.log("Firebase inicializado. Projeto:", config.projectId);
-            console.log("Caminho da coleção:", `/artifacts/${appId}/public/data/orders`);
-
-        } catch (e) {
-            document.getElementById('statusMessage').textContent = "Erro de configuração: " + e.message;
-            document.getElementById('statusContainer').classList.remove('hidden');
-            console.error(e);
-        }
-
-        let currentUser = null;
-
-        const initAuth = async () => {
-            console.log("Autenticando...");
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (e) {
-                console.warn("Tentando anônimo após falha...", e);
-                try { await signInAnonymously(auth); } catch(err) { console.error("Erro auth:", err); }
-            }
-        };
-
-        onAuthStateChanged(auth, (user) => {
-            currentUser = user;
-            console.log("Usuario:", user ? user.uid : "Deslogado");
-        });
-
-        initAuth();
+        // NÃO usamos mais o Firebase. Usaremos a API do Google Sheets diretamente.
+        
+        // CONFIGURAÇÃO DA PLANILHA
+        const SHEET_ID = '1Lwsx97SijssRttyUjnbseGhVTSXiciXtZ6Acszsi0h8'; // ID extraído do seu link
+        const SHEET_GID = '0'; // GID da aba (geralmente 0 para a primeira aba)
+        
+        // URL da API de Visualização do Google (retorna JSON em vez de HTML)
+        const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}`;
 
         const searchButton = document.getElementById('searchButton');
         const orderInput = document.getElementById('orderNumberInput');
@@ -194,17 +139,43 @@
             statusMessage.className = `text-center text-sm font-bold py-3 px-6 rounded-xl border shadow-sm ${isError ? 'text-red-700 bg-red-50 border-red-100' : 'text-slate-600 bg-slate-50 border-slate-100'}`;
         }
 
-        function getField(docData, possibleKeys) {
-            for (let key of possibleKeys) {
-                if (docData[key] !== undefined && docData[key] !== null) {
-                    return docData[key];
-                }
-            }
-            return '';
+        // Função para encontrar índices das colunas automaticamente
+        function mapColumns(cols) {
+            const map = {
+                pedido: -1,
+                cliente: -1,
+                rastreio: -1,
+                data: -1,
+                servico: -1
+            };
+
+            // Tenta identificar colunas pelo cabeçalho
+            cols.forEach((col, index) => {
+                const label = (col.label || '').toLowerCase().trim();
+                // Se não tiver label no objeto col, tenta usar o valor da primeira linha (feito na lógica principal)
+                
+                if (label.includes('pedido') || label.includes('nº') || label.includes('order')) map.pedido = index;
+                else if (label.includes('cliente') || label.includes('remetente') || label.includes('nome')) map.cliente = index;
+                else if (label.includes('rastreio') || label.includes('objeto') || label.includes('tracking')) map.rastreio = index;
+                else if (label.includes('data') || label.includes('emissão')) map.data = index;
+                else if (label.includes('serviço') || label.includes('tipo')) map.servico = index;
+            });
+
+            // Fallback: Se não encontrar pelos nomes, chuta posições padrão (ajuste conforme sua planilha real)
+            // Assumindo: A=Pedido, B=Cliente, C=Data, D=Rastreio
+            if (map.pedido === -1) map.pedido = 0; // Coluna A
+            if (map.cliente === -1) map.cliente = 1; // Coluna B
+            if (map.data === -1) map.data = 2; // Coluna C
+            if (map.rastreio === -1) map.rastreio = 4; // Coluna E (exemplo)
+            if (map.servico === -1) map.servico = 3; // Coluna D
+
+            return map;
         }
 
         window.handleSearch = async function() {
-            // Feedback Imediato
+            console.log("Iniciando busca na planilha...");
+            
+            // 1. Feedback Visual Imediato
             const originalBtnText = searchButton.innerHTML;
             searchButton.disabled = true;
             searchButton.innerHTML = `<div class="loader"></div>`;
@@ -214,6 +185,7 @@
             const rawQuery = orderInput.value.trim().toLowerCase();
             
             if (!rawQuery) {
+                showStatus("Por favor, digite um número.", true);
                 searchButton.disabled = false;
                 searchButton.innerHTML = originalBtnText;
                 setTimeout(() => orderInput.focus(), 100);
@@ -221,47 +193,80 @@
             }
 
             try {
-                if (!auth.currentUser) {
-                    await initAuth();
-                    if (!auth.currentUser) await new Promise(r => setTimeout(r, 1000));
-                }
-
-                // Caminho corrigido com appId 'portalrastreamento' (se for o padrão)
-                const ordersCol = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
-                const snapshot = await getDocs(ordersCol);
+                // 2. Busca dados da Planilha Google
+                console.log("Fetching: " + SHEET_URL);
+                const response = await fetch(SHEET_URL);
                 
-                const allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-                if (allOrders.length === 0) {
-                    console.warn(`Banco vazio em /artifacts/${appId}/public/data/orders`);
-                    showStatus("Nenhum pedido encontrado no banco de dados.", true);
-                    return;
+                if (!response.ok) {
+                    if (response.status === 403 || response.status === 401) {
+                        throw new Error("Permissão negada. A planilha precisa estar compartilhada como 'Qualquer pessoa com o link'.");
+                    }
+                    throw new Error(`Erro ao acessar planilha: ${response.status}`);
                 }
+
+                const textData = await response.text();
+                
+                // A API do Google retorna algo como: /*O_o*/ google.visualization.Query.setResponse({...});
+                // Precisamos limpar isso para obter o JSON puro
+                const jsonString = textData.match(/google\.visualization\.Query\.setResponse\(([\s\S\w]+)\);/);
+                
+                if (!jsonString || !jsonString[1]) {
+                    throw new Error("Formato de dados da planilha inválido.");
+                }
+
+                const data = JSON.parse(jsonString[1]);
+                const table = data.table;
+                
+                // Mapeamento de colunas
+                // Se os headers estiverem na linha 1 (que o Google chama de cols labels), usamos eles.
+                // Se não, teríamos que olhar a primeira linha de dados.
+                // O Google Visualization API geralmente coloca a linha 1 como labels se formatado como tabela.
+                const colMap = mapColumns(table.cols);
+                
+                console.log("Mapeamento de colunas detectado:", colMap);
 
                 const normalize = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                 const normalizedQuery = normalize(rawQuery);
 
-                const filtered = allOrders.filter(o => {
-                    const orderNumVal = getField(o, ['numeroPedido', 'NumeroPedido', 'pedido', 'Pedido', 'order', 'Order', 'numero_pedido']);
-                    const trackingVal = getField(o, ['codigoRastreio', 'CodigoRastreio', 'rastreio', 'Rastreio', 'tracking', 'Tracking']);
-                    const senderVal = getField(o, ['remetente', 'Remetente', 'cliente', 'Cliente', 'sender']);
+                const rows = table.rows;
+                const foundOrders = [];
 
-                    const orderNum = normalize(orderNumVal);
-                    const tracking = normalize(trackingVal);
-                    const sender = String(senderVal).toLowerCase();
-                    
-                    return orderNum.includes(normalizedQuery) || 
-                           tracking.includes(normalizedQuery) ||
-                           sender.includes(rawQuery);
+                rows.forEach(row => {
+                    // Células da linha (c pode ser null se a célula estiver vazia)
+                    const cells = row.c;
+                    if (!cells) return;
+
+                    // Função auxiliar para pegar valor seguro
+                    const getVal = (idx) => (cells[idx] && cells[idx].v) ? String(cells[idx].v) : '';
+
+                    const pedidoVal = getVal(colMap.pedido);
+                    const rastreioVal = getVal(colMap.rastreio);
+                    const clienteVal = getVal(colMap.cliente);
+
+                    // Verifica Match
+                    const pedidoNorm = normalize(pedidoVal);
+                    const rastreioNorm = normalize(rastreioVal);
+                    const clienteLower = clienteVal.toLowerCase();
+
+                    if (pedidoNorm.includes(normalizedQuery) || 
+                        rastreioNorm.includes(normalizedQuery) || 
+                        clienteLower.includes(rawQuery)) {
+                        
+                        foundOrders.push({
+                            numeroPedido: pedidoVal,
+                            remetente: clienteVal,
+                            dataLiberacao: getVal(colMap.data) || '-',
+                            codigoRastreio: rastreioVal,
+                            servico: getVal(colMap.servico) || 'Padrão'
+                        });
+                    }
                 });
 
-                displayResults(filtered, orderInput.value);
+                displayResults(foundOrders, orderInput.value);
 
             } catch (error) {
-                console.error("Erro busca:", error);
-                let msg = "Erro ao buscar.";
-                if (error.code === 'permission-denied') msg = "Permissão negada. Verifique se as Regras do Firestore permitem leitura.";
-                showStatus(msg, true);
+                console.error("Erro na busca:", error);
+                showStatus(error.message || "Erro desconhecido ao buscar dados.", true);
             } finally {
                 searchButton.disabled = false;
                 searchButton.innerHTML = 'Buscar';
@@ -275,13 +280,7 @@
             }
 
             orders.forEach(order => {
-                const numPedido = getField(order, ['numeroPedido', 'NumeroPedido', 'pedido', 'Pedido']) || 'N/A';
-                const remetente = getField(order, ['remetente', 'Remetente', 'cliente']) || 'Cliente';
-                const servico = getField(order, ['servico', 'Servico', 'service']) || 'Padrão';
-                const dataLib = getField(order, ['dataLiberacao', 'DataLiberacao', 'data']) || '-';
-                const rastreioRaw = getField(order, ['codigoRastreio', 'CodigoRastreio', 'rastreio']);
-
-                const rastreio = String(rastreioRaw || '').trim();
+                const rastreio = (order.codigoRastreio || '').trim();
                 const hasTracking = rastreio && rastreio.toLowerCase() !== 'pendente' && rastreio.length > 5;
 
                 const cardHTML = `
@@ -291,11 +290,11 @@
                             <div class="flex justify-between items-start mb-6">
                                 <div>
                                     <span class="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1 block">Pedido</span>
-                                    <h2 class="text-3xl font-black text-slate-800 tracking-tighter">#${numPedido}</h2>
-                                    <p class="text-slate-500 font-bold text-xs mt-1 truncate max-w-[200px]">${remetente}</p>
+                                    <h2 class="text-3xl font-black text-slate-800 tracking-tighter">#${order.numeroPedido || 'N/A'}</h2>
+                                    <p class="text-slate-500 font-bold text-xs mt-1 truncate max-w-[200px]">${order.remetente || 'Cliente'}</p>
                                 </div>
                                 <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase border border-blue-100">
-                                    ${servico}
+                                    ${order.servico}
                                 </span>
                             </div>
 
@@ -306,7 +305,7 @@
                                     </div>
                                     <div class="flex flex-col">
                                         <span class="text-[9px] font-bold text-slate-400 uppercase">Data</span>
-                                        <span class="text-xs font-bold text-slate-700">${dataLib}</span>
+                                        <span class="text-xs font-bold text-slate-700">${order.dataLiberacao}</span>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-3">
@@ -362,6 +361,7 @@
             }, 2000);
         }
 
+        // Event Listeners
         if(searchButton) {
             searchButton.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -375,6 +375,7 @@
     </script>
 </body>
 </html>
+
 
 
 
