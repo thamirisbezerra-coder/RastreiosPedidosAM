@@ -32,7 +32,7 @@
 </head>
 <body class="min-h-screen flex flex-col items-center justify-start md:justify-center p-4 pt-6 md:pt-4">
 
-    <!-- Container de Erro Global (Invisível a menos que algo quebre muito feio) -->
+    <!-- Container de Erro Global -->
     <div id="globalError" class="hidden fixed top-0 left-0 w-full bg-red-600 text-white p-4 text-center z-50 font-bold text-xs"></div>
 
     <div class="w-full max-w-4xl bg-white shadow-2xl rounded-3xl overflow-hidden border border-gray-100">
@@ -57,7 +57,6 @@
                     </div>
                     <input type="text" id="orderNumberInput" placeholder="Número do pedido (ex: 478569)..." class="block w-full pl-11 pr-4 py-4 rounded-xl leading-5 bg-transparent focus:outline-none text-lg text-gray-800" autocomplete="off" inputmode="text">
                 </div>
-                <!-- Adicionado onclick direto como fallback -->
                 <button id="searchButton" type="button" onclick="window.handleSearch && window.handleSearch()" class="btn-gradient text-white font-bold py-4 px-10 rounded-xl shadow-md flex items-center justify-center min-w-[140px] text-lg active:scale-95 transition-transform">
                     Buscar
                 </button>
@@ -117,48 +116,61 @@
 
         let app, auth, db, appId;
 
-        // Bloco seguro de inicialização
+        // === CONFIGURAÇÃO DO FIREBASE ===
         try {
-            if (typeof __firebase_config === 'undefined' || !__firebase_config) {
-                throw new Error("Configuração do Firebase não encontrada.");
+            let config;
+            // 1. Tenta pegar do ambiente (se estiver no editor)
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                config = JSON.parse(__firebase_config);
+            } else {
+                // 2. Fallback para a configuração manual fornecida
+                config = {
+                    apiKey: "AIzaSyA9mHfjnzFCuvZgXFg3Mp6rpQDJJwUdKGc",
+                    authDomain: "portalrastreamento.firebaseapp.com",
+                    projectId: "portalrastreamento",
+                    storageBucket: "portalrastreamento.firebasestorage.app",
+                    messagingSenderId: "433804439404",
+                    appId: "1:433804439404:web:2af4693cc66e502d248d49",
+                    measurementId: "G-SZTTQJJ0S3"
+                };
             }
-            const firebaseConfig = JSON.parse(__firebase_config);
-            app = initializeApp(firebaseConfig);
+
+            app = initializeApp(config);
             auth = getAuth(app);
             db = getFirestore(app);
-            appId = typeof __app_id !== 'undefined' ? __app_id : 'rastreamento-am';
+            
+            // IMPORTANTE: O appId no banco deve bater com o das regras de segurança
+            // Se __app_id não existir, usa 'portalrastreamento' conforme suas regras
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'portalrastreamento';
+            
+            console.log("Firebase inicializado. Projeto:", config.projectId);
+            console.log("Caminho da coleção:", `/artifacts/${appId}/public/data/orders`);
+
         } catch (e) {
-            document.getElementById('statusMessage').textContent = "Erro crítico de configuração: " + e.message;
+            document.getElementById('statusMessage').textContent = "Erro de configuração: " + e.message;
             document.getElementById('statusContainer').classList.remove('hidden');
-            throw e; 
+            console.error(e);
         }
 
         let currentUser = null;
 
         const initAuth = async () => {
-            console.log("Iniciando fluxo de autenticação...");
+            console.log("Autenticando...");
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
-                    console.log("Autenticado via Token");
                 } else {
                     await signInAnonymously(auth);
-                    console.log("Autenticado como Anônimo");
                 }
             } catch (e) {
-                console.warn("Falha na autenticação primária, tentando fallback anônimo...", e);
-                try {
-                    await signInAnonymously(auth);
-                } catch (err) {
-                    console.error("Falha total de autenticação:", err);
-                    showStatus("Erro de conexão. Verifique sua internet.", true);
-                }
+                console.warn("Tentando anônimo após falha...", e);
+                try { await signInAnonymously(auth); } catch(err) { console.error("Erro auth:", err); }
             }
         };
 
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
-            console.log("Estado Auth:", user ? "OK" : "Pendente");
+            console.log("Usuario:", user ? user.uid : "Deslogado");
         });
 
         initAuth();
@@ -191,11 +203,8 @@
             return '';
         }
 
-        // Tornando a função global para garantir que o onclick funcione
         window.handleSearch = async function() {
-            console.log("handleSearch disparado");
-            
-            // UI Feedback Imediato
+            // Feedback Imediato
             const originalBtnText = searchButton.innerHTML;
             searchButton.disabled = true;
             searchButton.innerHTML = `<div class="loader"></div>`;
@@ -207,32 +216,25 @@
             if (!rawQuery) {
                 searchButton.disabled = false;
                 searchButton.innerHTML = originalBtnText;
-                // Pequeno delay para evitar flash
                 setTimeout(() => orderInput.focus(), 100);
                 return;
             }
 
             try {
-                // Autenticação sob demanda se necessário
                 if (!auth.currentUser) {
-                    console.log("Tentando reconexão rápida...");
                     await initAuth();
-                    if (!auth.currentUser) {
-                        // Aguarda um pouco mais
-                        await new Promise(r => setTimeout(r, 1000));
-                        if (!auth.currentUser) throw new Error("Falha de conexão com o servidor de dados.");
-                    }
+                    if (!auth.currentUser) await new Promise(r => setTimeout(r, 1000));
                 }
 
-                // Busca
+                // Caminho corrigido com appId 'portalrastreamento' (se for o padrão)
                 const ordersCol = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
                 const snapshot = await getDocs(ordersCol);
                 
                 const allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                // Verifica banco vazio
                 if (allOrders.length === 0) {
-                    showStatus("O sistema está conectado, mas a lista de pedidos está vazia.", true);
+                    console.warn(`Banco vazio em /artifacts/${appId}/public/data/orders`);
+                    showStatus("Nenhum pedido encontrado no banco de dados.", true);
                     return;
                 }
 
@@ -256,11 +258,9 @@
                 displayResults(filtered, orderInput.value);
 
             } catch (error) {
-                console.error("Erro no fluxo de busca:", error);
-                let msg = "Erro desconhecido.";
-                if (error.code === 'permission-denied') msg = "Permissão negada. Recarregue a página.";
-                else if (error.message) msg = error.message;
-                
+                console.error("Erro busca:", error);
+                let msg = "Erro ao buscar.";
+                if (error.code === 'permission-denied') msg = "Permissão negada. Verifique se as Regras do Firestore permitem leitura.";
                 showStatus(msg, true);
             } finally {
                 searchButton.disabled = false;
@@ -362,7 +362,6 @@
             }, 2000);
         }
 
-        // Listener duplo (DOM e JS) para garantir funcionamento
         if(searchButton) {
             searchButton.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -376,7 +375,6 @@
     </script>
 </body>
 </html>
-
 
 
 
