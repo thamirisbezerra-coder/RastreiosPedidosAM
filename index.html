@@ -32,6 +32,9 @@
 </head>
 <body class="min-h-screen flex flex-col items-center justify-start md:justify-center p-4 pt-6 md:pt-4">
 
+    <!-- Container de Erro Global (Invisível a menos que algo quebre muito feio) -->
+    <div id="globalError" class="hidden fixed top-0 left-0 w-full bg-red-600 text-white p-4 text-center z-50 font-bold text-xs"></div>
+
     <div class="w-full max-w-4xl bg-white shadow-2xl rounded-3xl overflow-hidden border border-gray-100">
         <div class="p-6 md:p-12 space-y-8">
             
@@ -54,7 +57,8 @@
                     </div>
                     <input type="text" id="orderNumberInput" placeholder="Número do pedido (ex: 478569)..." class="block w-full pl-11 pr-4 py-4 rounded-xl leading-5 bg-transparent focus:outline-none text-lg text-gray-800" autocomplete="off" inputmode="text">
                 </div>
-                <button id="searchButton" type="button" class="btn-gradient text-white font-bold py-4 px-10 rounded-xl shadow-md flex items-center justify-center min-w-[140px] text-lg active:scale-95 transition-transform">
+                <!-- Adicionado onclick direto como fallback -->
+                <button id="searchButton" type="button" onclick="window.handleSearch && window.handleSearch()" class="btn-gradient text-white font-bold py-4 px-10 rounded-xl shadow-md flex items-center justify-center min-w-[140px] text-lg active:scale-95 transition-transform">
                     Buscar
                 </button>
             </div>
@@ -96,39 +100,65 @@
         </div>
     </div>
 
+    <!-- Script de Erro Global -->
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            const el = document.getElementById('globalError');
+            el.textContent = `Erro do Sistema: ${message}`;
+            el.classList.remove('hidden');
+            console.error("Global Error:", error);
+        };
+    </script>
+
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { getFirestore, collection, getDocs, query } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-        // Inicialização do Firebase
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'rastreamento-am';
+        let app, auth, db, appId;
+
+        // Bloco seguro de inicialização
+        try {
+            if (typeof __firebase_config === 'undefined' || !__firebase_config) {
+                throw new Error("Configuração do Firebase não encontrada.");
+            }
+            const firebaseConfig = JSON.parse(__firebase_config);
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'rastreamento-am';
+        } catch (e) {
+            document.getElementById('statusMessage').textContent = "Erro crítico de configuração: " + e.message;
+            document.getElementById('statusContainer').classList.remove('hidden');
+            throw e; 
+        }
 
         let currentUser = null;
 
         const initAuth = async () => {
-            console.log("Tentando autenticar...");
+            console.log("Iniciando fluxo de autenticação...");
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
+                    console.log("Autenticado via Token");
                 } else {
                     await signInAnonymously(auth);
+                    console.log("Autenticado como Anônimo");
                 }
-                console.log("Autenticação concluída.");
             } catch (e) {
-                console.error("Erro de autenticação:", e);
-                // Fallback: se token falhar, tenta anônimo
-                try { await signInAnonymously(auth); } catch(err) { console.error("Falha no fallback anônimo", err); }
+                console.warn("Falha na autenticação primária, tentando fallback anônimo...", e);
+                try {
+                    await signInAnonymously(auth);
+                } catch (err) {
+                    console.error("Falha total de autenticação:", err);
+                    showStatus("Erro de conexão. Verifique sua internet.", true);
+                }
             }
         };
 
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
-            console.log("Estado do usuário alterado:", user ? "Logado" : "Deslogado");
+            console.log("Estado Auth:", user ? "OK" : "Pendente");
         });
 
         initAuth();
@@ -146,6 +176,7 @@
         };
 
         function showStatus(msg, isError = false) {
+            if(!statusMessage) return;
             statusMessage.textContent = msg;
             statusContainer.classList.remove('hidden');
             statusMessage.className = `text-center text-sm font-bold py-3 px-6 rounded-xl border shadow-sm ${isError ? 'text-red-700 bg-red-50 border-red-100' : 'text-slate-600 bg-slate-50 border-slate-100'}`;
@@ -160,54 +191,54 @@
             return '';
         }
 
-        async function handleSearch() {
-            console.log("Botão de busca clicado."); // Log de verificação imediata
-
-            // 1. Feedback Visual IMEDIATO
-            // Isso acontece antes de qualquer lógica para garantir que o usuário saiba que clicou
+        // Tornando a função global para garantir que o onclick funcione
+        window.handleSearch = async function() {
+            console.log("handleSearch disparado");
+            
+            // UI Feedback Imediato
             const originalBtnText = searchButton.innerHTML;
             searchButton.disabled = true;
             searchButton.innerHTML = `<div class="loader"></div>`;
             resultsContainer.innerHTML = '';
             statusContainer.classList.add('hidden');
 
-            let rawQuery = orderInput.value.trim().toLowerCase();
+            const rawQuery = orderInput.value.trim().toLowerCase();
+            
             if (!rawQuery) {
-                showStatus("Por favor, digite um número de pedido.", true);
                 searchButton.disabled = false;
-                searchButton.innerHTML = originalBtnText; // Restaura o botão
+                searchButton.innerHTML = originalBtnText;
+                // Pequeno delay para evitar flash
+                setTimeout(() => orderInput.focus(), 100);
                 return;
             }
 
             try {
-                // 2. Verifica autenticação
+                // Autenticação sob demanda se necessário
                 if (!auth.currentUser) {
-                    console.log("Usuário não detectado, aguardando conexão...");
+                    console.log("Tentando reconexão rápida...");
                     await initAuth();
-                    // Pequena pausa para propagação do estado
-                    await new Promise(r => setTimeout(r, 500));
-                }
-                
-                if (!auth.currentUser) {
-                     throw new Error("Não foi possível conectar ao servidor. Verifique sua internet.");
+                    if (!auth.currentUser) {
+                        // Aguarda um pouco mais
+                        await new Promise(r => setTimeout(r, 1000));
+                        if (!auth.currentUser) throw new Error("Falha de conexão com o servidor de dados.");
+                    }
                 }
 
-                // 3. Executa a busca
-                let normalizedQuery = rawQuery.replace(/[^a-z0-9]/g, '');
-                
+                // Busca
                 const ordersCol = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
                 const snapshot = await getDocs(ordersCol);
                 
                 const allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+                // Verifica banco vazio
                 if (allOrders.length === 0) {
-                    console.warn("Banco vazio.");
-                    showStatus("O sistema está online, mas nenhum pedido foi encontrado na base de dados.", true);
+                    showStatus("O sistema está conectado, mas a lista de pedidos está vazia.", true);
                     return;
                 }
 
                 const normalize = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                
+                const normalizedQuery = normalize(rawQuery);
+
                 const filtered = allOrders.filter(o => {
                     const orderNumVal = getField(o, ['numeroPedido', 'NumeroPedido', 'pedido', 'Pedido', 'order', 'Order', 'numero_pedido']);
                     const trackingVal = getField(o, ['codigoRastreio', 'CodigoRastreio', 'rastreio', 'Rastreio', 'tracking', 'Tracking']);
@@ -225,18 +256,17 @@
                 displayResults(filtered, orderInput.value);
 
             } catch (error) {
-                console.error("Erro na busca:", error);
-                if (error.code === 'permission-denied') {
-                    showStatus('Erro de permissão. Tente recarregar a página.', true);
-                } else {
-                    showStatus(error.message || 'Ocorreu um erro ao buscar. Tente novamente.', true);
-                }
+                console.error("Erro no fluxo de busca:", error);
+                let msg = "Erro desconhecido.";
+                if (error.code === 'permission-denied') msg = "Permissão negada. Recarregue a página.";
+                else if (error.message) msg = error.message;
+                
+                showStatus(msg, true);
             } finally {
-                // Sempre restaura o botão no final
                 searchButton.disabled = false;
                 searchButton.innerHTML = 'Buscar';
             }
-        }
+        };
 
         function displayResults(orders, query) {
             if (orders.length === 0) {
@@ -332,16 +362,21 @@
             }, 2000);
         }
 
-        // Verifica se o botão existe antes de adicionar o listener
+        // Listener duplo (DOM e JS) para garantir funcionamento
         if(searchButton) {
-            searchButton.addEventListener('click', handleSearch);
+            searchButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.handleSearch();
+            });
         }
         if(orderInput) {
-            orderInput.addEventListener('keydown', (e) => e.key === 'Enter' && handleSearch());
+            orderInput.addEventListener('keydown', (e) => e.key === 'Enter' && window.handleSearch());
         }
+
     </script>
 </body>
 </html>
+
 
 
 
