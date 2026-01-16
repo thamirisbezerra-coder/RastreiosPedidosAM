@@ -52,7 +52,7 @@
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     </div>
-                    <input type="text" id="orderNumberInput" placeholder="Número do pedido..." class="block w-full pl-11 pr-4 py-4 rounded-xl leading-5 bg-transparent focus:outline-none text-lg text-gray-800" autocomplete="off" inputmode="numeric">
+                    <input type="text" id="orderNumberInput" placeholder="Número do pedido (ex: 478569)..." class="block w-full pl-11 pr-4 py-4 rounded-xl leading-5 bg-transparent focus:outline-none text-lg text-gray-800" autocomplete="off" inputmode="numeric">
                 </div>
                 <button id="searchButton" class="btn-gradient text-white font-bold py-4 px-10 rounded-xl shadow-md flex items-center justify-center min-w-[140px] text-lg active:scale-95 transition-transform">
                     Buscar
@@ -96,9 +96,34 @@
         </div>
     </div>
 
-    <script>
-        // Link direto de exportação CSV da planilha publicada
-        const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQC3mPERYzFPaxVH6ZCrexvKjtWmmcWKMWjQ1_UkJrPdKm7yAZq4eyokj-4r7hO2BXGDY7d2Gk-uVLc/pub?output=csv';
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, collection, getDocs, query } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        // Inicialização do Firebase (Dados providos pelo ambiente)
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'rastreamento-am';
+
+        let currentUser = null;
+
+        // Autenticação Silenciosa (Indispensável para Firestore)
+        const initAuth = async () => {
+            try {
+                await signInAnonymously(auth);
+            } catch (e) {
+                console.error("Erro de autenticação:", e);
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+        });
+
+        initAuth();
 
         const searchButton = document.getElementById('searchButton');
         const orderInput = document.getElementById('orderNumberInput');
@@ -109,8 +134,7 @@
         const icons = {
             check: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
             copy: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`,
-            external: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`,
-            box: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>`
+            external: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`
         };
 
         function showStatus(msg, isError = false) {
@@ -119,49 +143,15 @@
             statusMessage.className = `text-center text-sm font-bold py-3 px-6 rounded-xl border shadow-sm ${isError ? 'text-red-700 bg-red-50 border-red-100' : 'text-slate-600 bg-slate-50 border-slate-100'}`;
         }
 
-        // Parser de CSV robusto para Google Sheets
-        function parseCSV(text) {
-            const lines = [];
-            let currentLine = [];
-            let currentVal = '';
-            let inQuotes = false;
-
-            for (let i = 0; i < text.length; i++) {
-                const char = text[i];
-                if (char === '"') {
-                    inQuotes = !inQuotes;
-                } else if (char === ',' && !inQuotes) {
-                    currentLine.push(currentVal.trim());
-                    currentVal = '';
-                } else if ((char === '\n' || char === '\r') && !inQuotes) {
-                    if (currentVal || currentLine.length > 0) {
-                        currentLine.push(currentVal.trim());
-                        lines.push(currentLine);
-                        currentLine = [];
-                        currentVal = '';
-                    }
-                    if (char === '\r' && text[i + 1] === '\n') i++;
-                } else {
-                    currentVal += char;
-                }
-            }
-            if (currentVal || currentLine.length > 0) {
-                currentLine.push(currentVal.trim());
-                lines.push(currentLine);
-            }
-
-            const headers = lines[0].map(h => h.toLowerCase());
-            return lines.slice(1).map(row => {
-                const obj = {};
-                headers.forEach((header, i) => {
-                    obj[header] = row[i] || '';
-                });
-                return obj;
-            });
-        }
-
         async function handleSearch() {
-            let queryVal = orderInput.value.trim().replace(/(pedido|#|\.)/gi, '').trim();
+            if (!currentUser) {
+                await initAuth();
+            }
+
+            let queryVal = orderInput.value.trim();
+            // Remove prefixos comuns mas mantém o resto para a lógica de normalização abaixo
+            queryVal = queryVal.replace(/(pedido|#|№)/gi, '').trim();
+
             if (!queryVal) return;
 
             searchButton.disabled = true;
@@ -170,60 +160,57 @@
             statusContainer.classList.add('hidden');
 
             try {
-                // Fetch direto dos servidores do Google (Altamente compatível com redes móveis)
-                const response = await fetch(SHEET_CSV_URL, {
-                    method: 'GET',
-                    cache: 'no-store'
+                // Seguindo a Regra 1: Caminho estrito
+                const ordersCol = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
+                const snapshot = await getDocs(ordersCol);
+                
+                const allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                // === LÓGICA DE BUSCA MELHORADA ===
+                // Função que remove tudo que não é letra ou número (remove /, ., -, espaços)
+                // Isso permite que "478569" encontre "478569/1387" ou "478.569-01"
+                const normalize = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                
+                const searchNormalized = normalize(queryVal);
+
+                const filtered = allOrders.filter(o => {
+                    const dbNormalized = normalize(o.numeroPedido);
+                    return dbNormalized.includes(searchNormalized);
                 });
 
-                if (!response.ok) throw new Error();
-                
-                const csvText = await response.text();
-                const allOrders = parseCSV(csvText);
-                
-                // Busca exata pelo número do pedido
-                const filtered = allOrders.filter(o => 
-                    String(o.numeropedido) === queryVal || 
-                    String(o.pedido) === queryVal
-                );
+                displayResults(filtered, queryVal);
 
-                if (filtered.length === 0) {
-                    showStatus(`Pedido #${queryVal} ainda não disponível ou não encontrado.`, false);
-                } else {
-                    displayResults(filtered);
-                }
             } catch (error) {
-                console.error("Erro na busca:", error);
-                showStatus('Erro ao carregar dados da planilha. Tente novamente.', true);
+                console.error(error);
+                showStatus('Erro ao carregar dados. Tente novamente em alguns instantes.', true);
             } finally {
                 searchButton.disabled = false;
                 searchButton.textContent = 'Buscar';
             }
         }
 
-        function displayResults(orders) {
+        function displayResults(orders, query) {
+            if (orders.length === 0) {
+                showStatus(`Nenhum pedido encontrado para "${query}".`, false);
+                return;
+            }
+
             orders.forEach(order => {
-                const numPedido = order.numeropedido || order.pedido;
-                const remetente = order.remetente || 'Cliente';
-                const dataLib = order.dataliberacao || '-';
-                const rastreio = (order.codigorastreio || order.rastreio || '').trim();
-                const servico = order.servico || 'Padrão';
-                
-                const isPendente = !rastreio || rastreio.toLowerCase() === 'pendente';
-                const hasTracking = !isPendente && rastreio.length > 5;
+                const rastreio = (order.codigoRastreio || '').trim();
+                const hasTracking = rastreio && rastreio.toLowerCase() !== 'pendente' && rastreio.length > 5;
 
                 const cardHTML = `
-                    <div class="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden relative animate-in fade-in slide-in-from-bottom-2 duration-500">
+                    <div class="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden relative">
                         <div class="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
                         <div class="p-6 md:p-8 ml-2">
                             <div class="flex justify-between items-start mb-6">
                                 <div>
                                     <span class="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1 block">Pedido</span>
-                                    <h2 class="text-3xl font-black text-slate-800 tracking-tighter">#${numPedido}</h2>
-                                    <p class="text-slate-500 font-bold text-xs mt-1 truncate max-w-[200px]">${remetente}</p>
+                                    <h2 class="text-3xl font-black text-slate-800 tracking-tighter">#${order.numeroPedido}</h2>
+                                    <p class="text-slate-500 font-bold text-xs mt-1 truncate max-w-[200px]">${order.remetente || 'Cliente'}</p>
                                 </div>
                                 <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase border border-blue-100">
-                                    ${servico}
+                                    ${order.servico || 'Padrão'}
                                 </span>
                             </div>
 
@@ -233,16 +220,16 @@
                                         ${icons.check}
                                     </div>
                                     <div class="flex flex-col">
-                                        <span class="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">Liberação</span>
-                                        <span class="text-xs font-bold text-slate-700">${dataLib}</span>
+                                        <span class="text-[9px] font-bold text-slate-400 uppercase">Data</span>
+                                        <span class="text-xs font-bold text-slate-700">${order.dataLiberacao || '-'}</span>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <div class="w-8 h-8 rounded-full ${hasTracking ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-400'} flex items-center justify-center">
-                                        ${hasTracking ? icons.box : '...'}
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
                                     </div>
                                     <div class="flex flex-col">
-                                        <span class="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">Status</span>
+                                        <span class="text-[9px] font-bold text-slate-400 uppercase">Status</span>
                                         <span class="text-xs font-bold ${hasTracking ? 'text-blue-600' : 'text-slate-500'}">${hasTracking ? 'Postado' : 'Aguardando'}</span>
                                     </div>
                                 </div>
@@ -251,9 +238,9 @@
                             <div class="space-y-3">
                                 <label class="text-[10px] font-bold text-slate-400 uppercase px-1">Código de Rastreio</label>
                                 <div class="bg-gray-100 p-4 rounded-xl font-mono text-lg text-slate-700 border border-slate-200 flex items-center justify-between shadow-inner">
-                                    <span class="tracking-widest font-black">${isPendente ? 'Aguardando atualizar' : rastreio}</span>
+                                    <span class="tracking-widest font-black">${!hasTracking ? 'Disponível em breve' : rastreio}</span>
                                     ${hasTracking ? `
-                                        <button onclick="copyToClipboard('${rastreio}', this)" class="p-2 text-slate-400 hover:text-blue-600">
+                                        <button onclick="window.copyToClipboard('${rastreio}', this)" class="p-2 text-slate-400 hover:text-blue-600 transition-colors">
                                             ${icons.copy}
                                         </button>
                                     ` : ''}
@@ -281,10 +268,13 @@
             el.select();
             document.execCommand('copy');
             document.body.removeChild(el);
-            
             const original = btnElement.innerHTML;
             btnElement.innerHTML = icons.check;
-            setTimeout(() => btnElement.innerHTML = original, 2000);
+            btnElement.classList.add('text-green-600');
+            setTimeout(() => {
+                btnElement.innerHTML = original;
+                btnElement.classList.remove('text-green-600');
+            }, 2000);
         }
 
         searchButton.addEventListener('click', handleSearch);
@@ -292,6 +282,7 @@
     </script>
 </body>
 </html>
+
 
 
 
