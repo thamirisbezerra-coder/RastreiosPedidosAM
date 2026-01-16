@@ -54,7 +54,7 @@
                     </div>
                     <input type="text" id="orderNumberInput" placeholder="Número do pedido (ex: 478569)..." class="block w-full pl-11 pr-4 py-4 rounded-xl leading-5 bg-transparent focus:outline-none text-lg text-gray-800" autocomplete="off" inputmode="text">
                 </div>
-                <button id="searchButton" class="btn-gradient text-white font-bold py-4 px-10 rounded-xl shadow-md flex items-center justify-center min-w-[140px] text-lg active:scale-95 transition-transform">
+                <button id="searchButton" type="button" class="btn-gradient text-white font-bold py-4 px-10 rounded-xl shadow-md flex items-center justify-center min-w-[140px] text-lg active:scale-95 transition-transform">
                     Buscar
                 </button>
             </div>
@@ -111,20 +111,24 @@
         let currentUser = null;
 
         const initAuth = async () => {
+            console.log("Tentando autenticar...");
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(auth);
                 }
+                console.log("Autenticação concluída.");
             } catch (e) {
                 console.error("Erro de autenticação:", e);
-                showStatus("Erro ao conectar com o servidor. Tente recarregar.", true);
+                // Fallback: se token falhar, tenta anônimo
+                try { await signInAnonymously(auth); } catch(err) { console.error("Falha no fallback anônimo", err); }
             }
         };
 
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
+            console.log("Estado do usuário alterado:", user ? "Logado" : "Deslogado");
         });
 
         initAuth();
@@ -147,7 +151,6 @@
             statusMessage.className = `text-center text-sm font-bold py-3 px-6 rounded-xl border shadow-sm ${isError ? 'text-red-700 bg-red-50 border-red-100' : 'text-slate-600 bg-slate-50 border-slate-100'}`;
         }
 
-        // Helper para acessar campos com segurança, tentando variações de nome
         function getField(docData, possibleKeys) {
             for (let key of possibleKeys) {
                 if (docData[key] !== undefined && docData[key] !== null) {
@@ -158,49 +161,54 @@
         }
 
         async function handleSearch() {
-            if (!auth.currentUser) {
-                await initAuth();
-            }
-            
-            if (!auth.currentUser) {
-                showStatus("Aguardando conexão segura...", false);
-                await new Promise(r => setTimeout(r, 1000));
-                if (!auth.currentUser) {
-                     showStatus("Não foi possível autenticar. Tente recarregar a página.", true);
-                     return;
-                }
-            }
+            console.log("Botão de busca clicado."); // Log de verificação imediata
 
-            let rawQuery = orderInput.value.trim().toLowerCase();
-            let normalizedQuery = rawQuery.replace(/[^a-z0-9]/g, '');
-
-            if (!rawQuery) return;
-
+            // 1. Feedback Visual IMEDIATO
+            // Isso acontece antes de qualquer lógica para garantir que o usuário saiba que clicou
+            const originalBtnText = searchButton.innerHTML;
             searchButton.disabled = true;
             searchButton.innerHTML = `<div class="loader"></div>`;
             resultsContainer.innerHTML = '';
             statusContainer.classList.add('hidden');
 
+            let rawQuery = orderInput.value.trim().toLowerCase();
+            if (!rawQuery) {
+                showStatus("Por favor, digite um número de pedido.", true);
+                searchButton.disabled = false;
+                searchButton.innerHTML = originalBtnText; // Restaura o botão
+                return;
+            }
+
             try {
+                // 2. Verifica autenticação
+                if (!auth.currentUser) {
+                    console.log("Usuário não detectado, aguardando conexão...");
+                    await initAuth();
+                    // Pequena pausa para propagação do estado
+                    await new Promise(r => setTimeout(r, 500));
+                }
+                
+                if (!auth.currentUser) {
+                     throw new Error("Não foi possível conectar ao servidor. Verifique sua internet.");
+                }
+
+                // 3. Executa a busca
+                let normalizedQuery = rawQuery.replace(/[^a-z0-9]/g, '');
+                
                 const ordersCol = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
                 const snapshot = await getDocs(ordersCol);
                 
                 const allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                // === DIAGNÓSTICO: BANCO VAZIO ===
                 if (allOrders.length === 0) {
-                    console.warn("A coleção 'orders' está vazia no Firestore.");
-                    showStatus("Nenhum dado encontrado no sistema. Se você acabou de importar a planilha, verifique se a sincronização foi concluída.", true);
+                    console.warn("Banco vazio.");
+                    showStatus("O sistema está online, mas nenhum pedido foi encontrado na base de dados.", true);
                     return;
                 }
-
-                // DEBUG: Mostra o primeiro item para entender a estrutura dos campos
-                console.log("Exemplo de pedido no banco:", allOrders[0]);
 
                 const normalize = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                 
                 const filtered = allOrders.filter(o => {
-                    // Tenta encontrar o número do pedido em vários campos possíveis
                     const orderNumVal = getField(o, ['numeroPedido', 'NumeroPedido', 'pedido', 'Pedido', 'order', 'Order', 'numero_pedido']);
                     const trackingVal = getField(o, ['codigoRastreio', 'CodigoRastreio', 'rastreio', 'Rastreio', 'tracking', 'Tracking']);
                     const senderVal = getField(o, ['remetente', 'Remetente', 'cliente', 'Cliente', 'sender']);
@@ -209,7 +217,6 @@
                     const tracking = normalize(trackingVal);
                     const sender = String(senderVal).toLowerCase();
                     
-                    // A lógica .includes permite que "478569" encontre "4785691387" (que seria "478569/1387" normalizado)
                     return orderNum.includes(normalizedQuery) || 
                            tracking.includes(normalizedQuery) ||
                            sender.includes(rawQuery);
@@ -218,26 +225,26 @@
                 displayResults(filtered, orderInput.value);
 
             } catch (error) {
-                console.error("Erro detalhado na busca:", error);
+                console.error("Erro na busca:", error);
                 if (error.code === 'permission-denied') {
-                    showStatus('Acesso negado. Tente recarregar a página.', true);
+                    showStatus('Erro de permissão. Tente recarregar a página.', true);
                 } else {
-                    showStatus(`Erro ao buscar: ${error.message}`, true);
+                    showStatus(error.message || 'Ocorreu um erro ao buscar. Tente novamente.', true);
                 }
             } finally {
+                // Sempre restaura o botão no final
                 searchButton.disabled = false;
-                searchButton.textContent = 'Buscar';
+                searchButton.innerHTML = 'Buscar';
             }
         }
 
         function displayResults(orders, query) {
             if (orders.length === 0) {
-                showStatus(`Nenhum pedido encontrado para "${query}". Verifique se o número está correto.`, false);
+                showStatus(`Nenhum pedido encontrado para "${query}".`, false);
                 return;
             }
 
             orders.forEach(order => {
-                // Usa o helper também na exibição para garantir que mostre algo mesmo se o nome do campo mudar
                 const numPedido = getField(order, ['numeroPedido', 'NumeroPedido', 'pedido', 'Pedido']) || 'N/A';
                 const remetente = getField(order, ['remetente', 'Remetente', 'cliente']) || 'Cliente';
                 const servico = getField(order, ['servico', 'Servico', 'service']) || 'Padrão';
@@ -325,11 +332,17 @@
             }, 2000);
         }
 
-        searchButton.addEventListener('click', handleSearch);
-        orderInput.addEventListener('keydown', (e) => e.key === 'Enter' && handleSearch());
+        // Verifica se o botão existe antes de adicionar o listener
+        if(searchButton) {
+            searchButton.addEventListener('click', handleSearch);
+        }
+        if(orderInput) {
+            orderInput.addEventListener('keydown', (e) => e.key === 'Enter' && handleSearch());
+        }
     </script>
 </body>
 </html>
+
 
 
 
