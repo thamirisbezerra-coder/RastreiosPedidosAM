@@ -55,10 +55,9 @@
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     </div>
-                    <input type="text" id="orderNumberInput" placeholder="Número do pedido (ex: 478569)..." class="block w-full pl-11 pr-4 py-4 rounded-xl leading-5 bg-transparent focus:outline-none text-lg text-gray-800" autocomplete="off" inputmode="text">
+                    <input type="text" id="orderNumberInput" placeholder="Número do pedido (ex: 475896)..." class="block w-full pl-11 pr-4 py-4 rounded-xl leading-5 bg-transparent focus:outline-none text-lg text-gray-800" autocomplete="off" inputmode="text">
                 </div>
-                <!-- O botão agora chama a função global window.handleSearch -->
-                <button id="searchButton" type="button" onclick="window.handleSearch && window.handleSearch()" class="btn-gradient text-white font-bold py-4 px-10 rounded-xl shadow-md flex items-center justify-center min-w-[140px] text-lg active:scale-95 transition-transform">
+                <button id="searchButton" type="button" class="btn-gradient text-white font-bold py-4 px-10 rounded-xl shadow-md flex items-center justify-center min-w-[140px] text-lg active:scale-95 transition-transform">
                     Buscar
                 </button>
             </div>
@@ -154,26 +153,34 @@
                 else if (label.includes('serviço') || label.includes('tipo')) map.servico = index;
             });
 
-            // Mapeamento padrão (Fallback)
+            // Mapeamento padrão (Fallback) se não encontrar cabeçalhos exatos
             if (map.pedido === -1) map.pedido = 0; 
             if (map.cliente === -1) map.cliente = 1;
-            if (map.data === -1) map.data = 2; // Forçando coluna C
+            if (map.data === -1) map.data = 2;
             if (map.servico === -1) map.servico = 3; 
             if (map.rastreio === -1) map.rastreio = 4;
 
             return map;
         }
 
-        // Função mágica que extrai o ID Base
-        // Ex: "466817/1660" vira "466817"
-        // Ex: "466817 - Teste" vira "466817"
+        // ============================================================
+        // FUNÇÃO CRÍTICA: Extrai apenas o número base do pedido
+        // Transforma "475896/1396" em "475896"
+        // Transforma "475896 - Parte 1" em "475896"
+        // ============================================================
         function getBaseId(str) {
             if (!str) return '';
-            // Pega a primeira parte antes de /, -, . ou espaço
-            const firstPart = str.split(/[\/\-\.\s]/)[0];
-            // Limpa tudo que não for alfanumérico
+            // Converte para string
+            const s = String(str);
+            // Quebra a string onde tiver barra (/), traço (-), ponto (.) ou espaço
+            // e pega somente a primeira parte
+            const firstPart = s.split(/[\/\-\.\s]/)[0];
+            // Remove qualquer coisa que não seja letra ou número e deixa minúsculo
             return firstPart.replace(/[^a-z0-9]/gi, '').toLowerCase();
         }
+
+        // Função de normalização simples para textos gerais
+        const normalize = (str) => String(str || '').toLowerCase().trim();
 
         window.handleSearch = async function() {
             console.log("Iniciando busca na planilha...");
@@ -184,7 +191,9 @@
             resultsContainer.innerHTML = '';
             statusContainer.classList.add('hidden');
 
-            const rawQuery = orderInput.value.trim().toLowerCase();
+            const rawQuery = orderInput.value.trim();
+            const queryBase = getBaseId(rawQuery); // Ex: user digita "475896" -> queryBase "475896"
+            const queryLower = rawQuery.toLowerCase();
             
             if (!rawQuery) {
                 showStatus("Por favor, digite um número.", true);
@@ -199,6 +208,7 @@
                 if (!response.ok) throw new Error("Erro de conexão com a planilha.");
 
                 const textData = await response.text();
+                // Extrai o JSON que vem dentro da resposta do Google
                 const jsonString = textData.match(/google\.visualization\.Query\.setResponse\(([\s\S\w]+)\);/);
                 
                 if (!jsonString || !jsonString[1]) throw new Error("Erro ao processar dados.");
@@ -208,13 +218,8 @@
                 const colMap = mapColumns(table.cols);
                 const rows = table.rows;
 
-                // IDs de busca
-                const queryBase = getBaseId(rawQuery); // Busca "466817" vira "466817"
-                const normalize = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                const normalizedQuery = normalize(rawQuery);
-
                 const foundOrders = [];
-                // Set para evitar duplicatas (usando o ID Base como chave)
+                // IMPORTANTE: Conjunto para evitar duplicatas baseadas no ID Base
                 const seenBaseIds = new Set();
 
                 rows.forEach(row => {
@@ -227,29 +232,38 @@
                         return cell.f ? String(cell.f) : (cell.v ? String(cell.v) : '');
                     };
 
+                    // Valores da linha atual
                     const pedidoVal = getVal(colMap.pedido);
-                    const rowBaseId = getBaseId(pedidoVal); // Planilha "466817/1660" vira "466817"
-                    
-                    // Lógica de Deduplicação:
-                    // Se já encontramos um pedido com esse ID Base ("466817"), ignoramos os próximos
-                    if (seenBaseIds.has(rowBaseId)) return;
-
                     const rastreioVal = getVal(colMap.rastreio);
                     const clienteVal = getVal(colMap.cliente);
 
-                    // Lógica de Busca Poderosa:
-                    // 1. O ID Base da busca bate com o ID Base da linha? (466817 == 466817)
-                    // 2. Ou o texto normal contém a busca?
-                    const pedidoNorm = normalize(pedidoVal);
-                    const rastreioNorm = normalize(rastreioVal);
-                    const clienteLower = clienteVal.toLowerCase();
+                    // Identidade Base da linha (Ex: "475896/1396" vira "475896")
+                    const rowBaseId = getBaseId(pedidoVal); 
 
-                    if (rowBaseId === queryBase || // Match exato do número base
-                        pedidoNorm.includes(normalizedQuery) || 
-                        rastreioNorm.includes(normalizedQuery) || 
-                        clienteLower.includes(rawQuery)) {
-                        
-                        seenBaseIds.add(rowBaseId); // Marca esse ID Base como visto
+                    // LÓGICA DE MATCH
+                    let isMatch = false;
+
+                    // 1. O número base da busca bate com o número base da linha? (Prioridade)
+                    if (rowBaseId && queryBase && rowBaseId === queryBase) {
+                        isMatch = true;
+                    }
+                    // 2. Ou o texto normal contém a busca?
+                    else if (normalize(pedidoVal).includes(queryLower) || 
+                             normalize(rastreioVal).includes(queryLower) || 
+                             normalize(clienteVal).includes(queryLower)) {
+                        isMatch = true;
+                    }
+
+                    if (isMatch) {
+                        // VERIFICAÇÃO DE DUPLICATA:
+                        // Se já mostramos um pedido com esse ID Base, ignoramos este aqui.
+                        // Isso garante que "475896" apareça apenas UMA VEZ.
+                        if (seenBaseIds.has(rowBaseId)) {
+                            return; // Pula essa iteração
+                        }
+
+                        // Se não é duplicata, adiciona aos vistos e aos resultados
+                        seenBaseIds.add(rowBaseId);
 
                         foundOrders.push({
                             numeroPedido: pedidoVal,
@@ -265,7 +279,7 @@
 
             } catch (error) {
                 console.error("Erro na busca:", error);
-                showStatus("Erro ao buscar dados. Verifique sua conexão.", true);
+                showStatus("Erro ao buscar dados. Tente novamente.", true);
             } finally {
                 searchButton.disabled = false;
                 searchButton.innerHTML = 'Buscar';
@@ -283,7 +297,7 @@
                 const hasTracking = rastreio && rastreio.toLowerCase() !== 'pendente' && rastreio.length > 5;
 
                 const cardHTML = `
-                    <div class="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden relative">
+                    <div class="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden relative fade-in">
                         <div class="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
                         <div class="p-6 md:p-8 ml-2">
                             <div class="flex justify-between items-start mb-6">
@@ -321,17 +335,17 @@
                             <div class="space-y-3">
                                 <label class="text-[10px] font-bold text-slate-400 uppercase px-1">Código de Rastreio</label>
                                 <div class="bg-gray-100 p-4 rounded-xl font-mono text-lg text-slate-700 border border-slate-200 flex items-center justify-between shadow-inner">
-                                    <span class="tracking-widest font-black">${!hasTracking ? 'Disponível em breve' : rastreio}</span>
+                                    <span class="tracking-widest font-black truncate mr-2">${!hasTracking ? 'Disponível em breve' : rastreio}</span>
                                     ${hasTracking ? `
-                                        <button onclick="window.copyToClipboard('${rastreio}', this)" class="p-2 text-slate-400 hover:text-blue-600 transition-colors">
+                                        <button onclick="window.copyToClipboard('${rastreio}', this)" class="p-2 text-slate-400 hover:text-blue-600 transition-colors flex-shrink-0">
                                             ${icons.copy}
                                         </button>
                                     ` : ''}
                                 </div>
                                 ${hasTracking ? `
                                     <a href="https://rastreamento.correios.com.br/app/index.php?objetos=${rastreio}" 
-                                        target="_blank"
-                                        class="bg-green-600 hover:bg-green-700 text-white w-full py-4 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95">
+                                       target="_blank"
+                                       class="bg-green-600 hover:bg-green-700 text-white w-full py-4 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95">
                                         <span>Rastrear Agora</span>
                                         ${icons.external}
                                     </a>
@@ -360,20 +374,23 @@
             }, 2000);
         }
 
-        // Event Listeners
-        if(searchButton) {
-            searchButton.addEventListener('click', (e) => {
+        // Listeners de Evento
+        searchButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.handleSearch();
+        });
+
+        orderInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
                 e.preventDefault();
                 window.handleSearch();
-            });
-        }
-        if(orderInput) {
-            orderInput.addEventListener('keydown', (e) => e.key === 'Enter' && window.handleSearch());
-        }
+            }
+        });
 
     </script>
 </body>
 </html>
+
 
 
 
