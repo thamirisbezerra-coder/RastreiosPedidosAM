@@ -150,25 +150,29 @@
                 if (label.includes('pedido') || label.includes('nº') || label.includes('order')) map.pedido = index;
                 else if (label.includes('cliente') || label.includes('remetente') || label.includes('nome')) map.cliente = index;
                 else if (label.includes('rastreio') || label.includes('objeto') || label.includes('tracking')) map.rastreio = index;
-                // Forçando Data na coluna C se não encontrar label claro
                 else if (label.includes('data') || label.includes('emissão')) map.data = index;
                 else if (label.includes('serviço') || label.includes('tipo')) map.servico = index;
             });
 
-            // Mapeamento padrão (Fallback) baseado no layout comum:
-            // A=0: Pedido
-            // B=1: Cliente
-            // C=2: Data (Correção Solicitada)
-            // D=3: Serviço
-            // E=4: Rastreio
+            // Mapeamento padrão (Fallback)
             if (map.pedido === -1) map.pedido = 0; 
             if (map.cliente === -1) map.cliente = 1;
-            // Garantindo que Data use a Coluna C (índice 2) se não detectado
-            if (map.data === -1) map.data = 2; 
+            if (map.data === -1) map.data = 2; // Forçando coluna C
             if (map.servico === -1) map.servico = 3; 
             if (map.rastreio === -1) map.rastreio = 4;
 
             return map;
+        }
+
+        // Função mágica que extrai o ID Base
+        // Ex: "466817/1660" vira "466817"
+        // Ex: "466817 - Teste" vira "466817"
+        function getBaseId(str) {
+            if (!str) return '';
+            // Pega a primeira parte antes de /, -, . ou espaço
+            const firstPart = str.split(/[\/\-\.\s]/)[0];
+            // Limpa tudo que não for alfanumérico
+            return firstPart.replace(/[^a-z0-9]/gi, '').toLowerCase();
         }
 
         window.handleSearch = async function() {
@@ -204,53 +208,53 @@
                 const colMap = mapColumns(table.cols);
                 const rows = table.rows;
 
-                // Função de normalização para busca flexível
+                // IDs de busca
+                const queryBase = getBaseId(rawQuery); // Busca "466817" vira "466817"
                 const normalize = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                 const normalizedQuery = normalize(rawQuery);
 
                 const foundOrders = [];
-                // Set para evitar duplicatas de pedido
-                const seenOrders = new Set();
+                // Set para evitar duplicatas (usando o ID Base como chave)
+                const seenBaseIds = new Set();
 
                 rows.forEach(row => {
                     const cells = row.c;
                     if (!cells) return;
 
-                    // CORREÇÃO DATA: Usa .f (formatted) se existir, senão .v (value)
                     const getVal = (idx) => {
                         const cell = cells[idx];
                         if (!cell) return '';
-                        // Prioriza o valor formatado (ex: "15/05/2023") ao invés do objeto bruto
                         return cell.f ? String(cell.f) : (cell.v ? String(cell.v) : '');
                     };
 
                     const pedidoVal = getVal(colMap.pedido);
+                    const rowBaseId = getBaseId(pedidoVal); // Planilha "466817/1660" vira "466817"
                     
-                    // CORREÇÃO DUPLICIDADE: Se já vimos este pedido, pula
-                    if (seenOrders.has(pedidoVal)) return;
+                    // Lógica de Deduplicação:
+                    // Se já encontramos um pedido com esse ID Base ("466817"), ignoramos os próximos
+                    if (seenBaseIds.has(rowBaseId)) return;
 
                     const rastreioVal = getVal(colMap.rastreio);
                     const clienteVal = getVal(colMap.cliente);
 
-                    // Lógica de Comparação
+                    // Lógica de Busca Poderosa:
+                    // 1. O ID Base da busca bate com o ID Base da linha? (466817 == 466817)
+                    // 2. Ou o texto normal contém a busca?
                     const pedidoNorm = normalize(pedidoVal);
                     const rastreioNorm = normalize(rastreioVal);
                     const clienteLower = clienteVal.toLowerCase();
 
-                    // Verifica se o texto normalizado contem a busca normalizada
-                    // Ex: Pedido na planilha "466817/1660" -> vira "4668171660"
-                    // Busca "466817" -> vira "466817"
-                    // "4668171660".includes("466817") -> VERDADEIRO
-                    if (pedidoNorm.includes(normalizedQuery) || 
+                    if (rowBaseId === queryBase || // Match exato do número base
+                        pedidoNorm.includes(normalizedQuery) || 
                         rastreioNorm.includes(normalizedQuery) || 
                         clienteLower.includes(rawQuery)) {
                         
-                        seenOrders.add(pedidoVal); // Marca como visto
+                        seenBaseIds.add(rowBaseId); // Marca esse ID Base como visto
 
                         foundOrders.push({
                             numeroPedido: pedidoVal,
                             remetente: clienteVal,
-                            dataLiberacao: getVal(colMap.data) || '-', // Agora usa a função getVal corrigida
+                            dataLiberacao: getVal(colMap.data) || '-',
                             codigoRastreio: rastreioVal,
                             servico: getVal(colMap.servico) || 'Padrão'
                         });
