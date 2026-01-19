@@ -111,13 +111,9 @@
     </script>
 
     <script type="module">
-        // NÃO usamos mais o Firebase. Usaremos a API do Google Sheets diretamente.
-        
         // CONFIGURAÇÃO DA PLANILHA
-        const SHEET_ID = '1Lwsx97SijssRttyUjnbseGhVTSXiciXtZ6Acszsi0h8'; // ID extraído do seu link
-        const SHEET_GID = '0'; // GID da aba (geralmente 0 para a primeira aba)
-        
-        // URL da API de Visualização do Google (retorna JSON em vez de HTML)
+        const SHEET_ID = '1Lwsx97SijssRttyUjnbseGhVTSXiciXtZ6Acszsi0h8'; 
+        const SHEET_GID = '0'; 
         const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}`;
 
         const searchButton = document.getElementById('searchButton');
@@ -139,35 +135,38 @@
             statusMessage.className = `text-center text-sm font-bold py-3 px-6 rounded-xl border shadow-sm ${isError ? 'text-red-700 bg-red-50 border-red-100' : 'text-slate-600 bg-slate-50 border-slate-100'}`;
         }
 
-        // Função para encontrar índices das colunas automaticamente
         function mapColumns(cols) {
             const map = {
                 pedido: -1,
                 cliente: -1,
-                rastreio: -1,
                 data: -1,
-                servico: -1
+                servico: -1,
+                rastreio: -1
             };
 
-            // Tenta identificar colunas pelo cabeçalho
             cols.forEach((col, index) => {
                 const label = (col.label || '').toLowerCase().trim();
-                // Se não tiver label no objeto col, tenta usar o valor da primeira linha (feito na lógica principal)
                 
                 if (label.includes('pedido') || label.includes('nº') || label.includes('order')) map.pedido = index;
                 else if (label.includes('cliente') || label.includes('remetente') || label.includes('nome')) map.cliente = index;
                 else if (label.includes('rastreio') || label.includes('objeto') || label.includes('tracking')) map.rastreio = index;
+                // Forçando Data na coluna C se não encontrar label claro
                 else if (label.includes('data') || label.includes('emissão')) map.data = index;
                 else if (label.includes('serviço') || label.includes('tipo')) map.servico = index;
             });
 
-            // Fallback: Se não encontrar pelos nomes, chuta posições padrão (ajuste conforme sua planilha real)
-            // Assumindo: A=Pedido, B=Cliente, C=Data, D=Rastreio
-            if (map.pedido === -1) map.pedido = 0; // Coluna A
-            if (map.cliente === -1) map.cliente = 1; // Coluna B
-            if (map.data === -1) map.data = 2; // Coluna C
-            if (map.rastreio === -1) map.rastreio = 4; // Coluna E (exemplo)
-            if (map.servico === -1) map.servico = 3; // Coluna D
+            // Mapeamento padrão (Fallback) baseado no layout comum:
+            // A=0: Pedido
+            // B=1: Cliente
+            // C=2: Data (Correção Solicitada)
+            // D=3: Serviço
+            // E=4: Rastreio
+            if (map.pedido === -1) map.pedido = 0; 
+            if (map.cliente === -1) map.cliente = 1;
+            // Garantindo que Data use a Coluna C (índice 2) se não detectado
+            if (map.data === -1) map.data = 2; 
+            if (map.servico === -1) map.servico = 3; 
+            if (map.rastreio === -1) map.rastreio = 4;
 
             return map;
         }
@@ -175,7 +174,6 @@
         window.handleSearch = async function() {
             console.log("Iniciando busca na planilha...");
             
-            // 1. Feedback Visual Imediato
             const originalBtnText = searchButton.innerHTML;
             searchButton.disabled = true;
             searchButton.innerHTML = `<div class="loader"></div>`;
@@ -193,69 +191,66 @@
             }
 
             try {
-                // 2. Busca dados da Planilha Google
-                console.log("Fetching: " + SHEET_URL);
                 const response = await fetch(SHEET_URL);
-                
-                if (!response.ok) {
-                    if (response.status === 403 || response.status === 401) {
-                        throw new Error("Permissão negada. A planilha precisa estar compartilhada como 'Qualquer pessoa com o link'.");
-                    }
-                    throw new Error(`Erro ao acessar planilha: ${response.status}`);
-                }
+                if (!response.ok) throw new Error("Erro de conexão com a planilha.");
 
                 const textData = await response.text();
-                
-                // A API do Google retorna algo como: /*O_o*/ google.visualization.Query.setResponse({...});
-                // Precisamos limpar isso para obter o JSON puro
                 const jsonString = textData.match(/google\.visualization\.Query\.setResponse\(([\s\S\w]+)\);/);
                 
-                if (!jsonString || !jsonString[1]) {
-                    throw new Error("Formato de dados da planilha inválido.");
-                }
+                if (!jsonString || !jsonString[1]) throw new Error("Erro ao processar dados.");
 
                 const data = JSON.parse(jsonString[1]);
                 const table = data.table;
-                
-                // Mapeamento de colunas
-                // Se os headers estiverem na linha 1 (que o Google chama de cols labels), usamos eles.
-                // Se não, teríamos que olhar a primeira linha de dados.
-                // O Google Visualization API geralmente coloca a linha 1 como labels se formatado como tabela.
                 const colMap = mapColumns(table.cols);
-                
-                console.log("Mapeamento de colunas detectado:", colMap);
+                const rows = table.rows;
 
+                // Função de normalização para busca flexível
                 const normalize = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                 const normalizedQuery = normalize(rawQuery);
 
-                const rows = table.rows;
                 const foundOrders = [];
+                // Set para evitar duplicatas de pedido
+                const seenOrders = new Set();
 
                 rows.forEach(row => {
-                    // Células da linha (c pode ser null se a célula estiver vazia)
                     const cells = row.c;
                     if (!cells) return;
 
-                    // Função auxiliar para pegar valor seguro
-                    const getVal = (idx) => (cells[idx] && cells[idx].v) ? String(cells[idx].v) : '';
+                    // CORREÇÃO DATA: Usa .f (formatted) se existir, senão .v (value)
+                    const getVal = (idx) => {
+                        const cell = cells[idx];
+                        if (!cell) return '';
+                        // Prioriza o valor formatado (ex: "15/05/2023") ao invés do objeto bruto
+                        return cell.f ? String(cell.f) : (cell.v ? String(cell.v) : '');
+                    };
 
                     const pedidoVal = getVal(colMap.pedido);
+                    
+                    // CORREÇÃO DUPLICIDADE: Se já vimos este pedido, pula
+                    if (seenOrders.has(pedidoVal)) return;
+
                     const rastreioVal = getVal(colMap.rastreio);
                     const clienteVal = getVal(colMap.cliente);
 
-                    // Verifica Match
+                    // Lógica de Comparação
                     const pedidoNorm = normalize(pedidoVal);
                     const rastreioNorm = normalize(rastreioVal);
                     const clienteLower = clienteVal.toLowerCase();
 
+                    // Verifica se o texto normalizado contem a busca normalizada
+                    // Ex: Pedido na planilha "466817/1660" -> vira "4668171660"
+                    // Busca "466817" -> vira "466817"
+                    // "4668171660".includes("466817") -> VERDADEIRO
                     if (pedidoNorm.includes(normalizedQuery) || 
                         rastreioNorm.includes(normalizedQuery) || 
                         clienteLower.includes(rawQuery)) {
                         
+                        seenOrders.add(pedidoVal); // Marca como visto
+
                         foundOrders.push({
                             numeroPedido: pedidoVal,
                             remetente: clienteVal,
-                            dataLiberacao: getVal(colMap.data) || '-',
+                            dataLiberacao: getVal(colMap.data) || '-', // Agora usa a função getVal corrigida
                             codigoRastreio: rastreioVal,
                             servico: getVal(colMap.servico) || 'Padrão'
                         });
@@ -266,7 +261,7 @@
 
             } catch (error) {
                 console.error("Erro na busca:", error);
-                showStatus(error.message || "Erro desconhecido ao buscar dados.", true);
+                showStatus("Erro ao buscar dados. Verifique sua conexão.", true);
             } finally {
                 searchButton.disabled = false;
                 searchButton.innerHTML = 'Buscar';
@@ -375,6 +370,7 @@
     </script>
 </body>
 </html>
+
 
 
 
