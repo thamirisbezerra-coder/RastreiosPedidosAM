@@ -4,66 +4,99 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Rastreamentos de Pedidos AM</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="https://i.postimg.cc/J0G8jfMQ/as-02-(2).png">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f8fafc;
-            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
-            background-size: 24px 24px;
+            /* Grid background moderno e sutil */
+            background-image: 
+                linear-gradient(to right, #e2e8f0 1px, transparent 1px),
+                linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
+            background-size: 32px 32px;
             -webkit-tap-highlight-color: transparent;
         }
+        
+        /* Pseudo-elemento para dar um gradiente suave de fundo por cima do grid */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(circle at top center, rgba(239, 246, 255, 0.8), rgba(248, 250, 252, 0.95) 100%);
+            z-index: -1;
+        }
+
         .loader {
             border: 3px solid rgba(255,255,255,0.3);
             border-radius: 50%;
             border-top: 3px solid #ffffff;
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
             animation: spin 0.8s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .btn-gradient { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); }
+        
+        .fade-in { animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Esconder ícone de X padrão do input type search/text em alguns browsers */
+        input[type="text"]::-webkit-search-decoration,
+        input[type="text"]::-webkit-search-cancel-button,
+        input[type="text"]::-webkit-search-results-button,
+        input[type="text"]::-webkit-search-results-decoration { display: none; }
+
         @media screen and (max-width: 768px) { input { font-size: 16px !important; } }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-start md:justify-center p-4 pt-6 md:pt-4">
+<body class="min-h-screen flex flex-col items-center justify-start md:justify-center p-4 pt-8 md:pt-4 relative">
 
     <!-- Container de Erro Global -->
-    <div id="globalError" class="hidden fixed top-0 left-0 w-full bg-red-600 text-white p-4 text-center z-50 font-bold text-xs"></div>
+    <div id="globalError" class="hidden fixed top-0 left-0 w-full bg-red-500 text-white p-3 text-center z-50 font-bold text-xs shadow-md"></div>
 
-    <div class="w-full max-w-4xl bg-white shadow-2xl rounded-3xl overflow-hidden border border-gray-100">
-        <div class="p-6 md:p-12 space-y-8">
+    <div class="w-full max-w-3xl bg-white/80 backdrop-blur-xl shadow-2xl rounded-[2rem] overflow-hidden border border-white/50 relative">
+        <!-- Detalhe decorativo no topo do card -->
+        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
+        
+        <div class="p-6 md:p-12 space-y-8 relative z-10">
             
             <!-- LOGO -->
-            <div class="flex justify-center">
-                <img src="<a href='https://postimg.cc/T5MB6Hyy' target='_blank'><img src='https://i.postimg.cc/T5MB6Hyy/as-02-(2).png' border='0' alt='as-02-(2)'></a>">
+            <div class="flex justify-center mb-2">
+                <img src="https://i.postimg.cc/J0G8jfMQ/as-02-(2).png" alt="Logo Doremus" class="h-10 md:h-12 w-auto object-contain opacity-90 hover:opacity-100 transition-opacity duration-300">
             </div>
 
             <!-- CABEÇALHO -->
-            <div class="text-center space-y-2">
-                <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Rastreamento de Amostras</h1>
-                <p class="text-slate-500 text-sm md:text-base font-medium">Consulte o status do seu pedido</p>
+            <div class="text-center space-y-3">
+                <h1 class="text-3xl md:text-4xl font-extrabold text-slate-800 tracking-tight">Rastreamento de Amostras</h1>
+                <p class="text-slate-500 text-sm md:text-base font-medium">Consulte rapidamente o status do seu pedido</p>
             </div>
 
             <!-- BUSCA -->
-            <div class="bg-gray-50 rounded-2xl p-2 border border-gray-200 flex flex-col md:flex-row gap-2 max-w-2xl mx-auto focus-within:border-blue-400 focus-within:bg-white transition-all shadow-sm">
-                <div class="relative flex-grow">
-                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            <div class="relative max-w-2xl mx-auto group">
+                <!-- Efeito de brilho sutil atrás da busca -->
+                <div class="absolute -inset-1 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-[1.5rem] blur opacity-50 group-focus-within:opacity-100 transition duration-500"></div>
+                
+                <div class="relative bg-white rounded-2xl p-1.5 border-2 border-slate-100 flex flex-col md:flex-row gap-2 focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-400/10 transition-all shadow-sm">
+                    <div class="relative flex-grow flex items-center">
+                        <div class="absolute left-4 flex items-center pointer-events-none text-slate-400">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </div>
+                        <input type="text" id="orderNumberInput" placeholder="Número do pedido (ex: 475896)..." class="block w-full pl-12 pr-4 py-3 md:py-4 rounded-xl leading-5 bg-transparent focus:outline-none text-lg text-slate-700 font-medium placeholder-slate-400" autocomplete="off" inputmode="text">
                     </div>
-                    <input type="text" id="orderNumberInput" placeholder="Número do pedido (ex: 475896)..." class="block w-full pl-11 pr-4 py-4 rounded-xl leading-5 bg-transparent focus:outline-none text-lg text-gray-800" autocomplete="off" inputmode="text">
+                    <button id="searchButton" type="button" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3.5 md:py-4 px-8 rounded-xl shadow-md flex items-center justify-center min-w-[140px] text-lg active:scale-95 transition-all">
+                        Buscar
+                    </button>
                 </div>
-                <button id="searchButton" type="button" class="btn-gradient text-white font-bold py-4 px-10 rounded-xl shadow-md flex items-center justify-center min-w-[140px] text-lg active:scale-95 transition-transform">
-                    Buscar
-                </button>
             </div>
 
-            <!-- STATUS -->
-            <div id="statusContainer" class="hidden mx-auto max-w-lg">
+            <!-- STATUS DE FEEDBACK -->
+            <div id="statusContainer" class="hidden mx-auto max-w-lg fade-in">
                 <p id="statusMessage" class="text-center text-sm font-bold py-3 px-6 rounded-xl border shadow-sm"></p>
             </div>
 
@@ -71,16 +104,17 @@
             <div id="shipmentsContainer" class="space-y-6"></div>
 
             <!-- QUADRO DE AVISO -->
-            <div class="bg-amber-50 border-l-4 border-amber-400 p-5 rounded-r-xl shadow-sm">
-                <div class="flex items-start">
-                    <div class="flex-shrink-0 mt-0.5">
-                        <svg class="h-6 w-6 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+            <div class="bg-amber-50/80 border border-amber-200/60 p-5 rounded-2xl shadow-sm relative overflow-hidden group">
+                <div class="absolute right-0 top-0 w-24 h-24 bg-amber-400/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+                <div class="flex items-start relative z-10">
+                    <div class="flex-shrink-0 mt-0.5 bg-amber-100 p-1.5 rounded-lg text-amber-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
                     <div class="ml-3">
-                        <h3 class="text-sm font-bold text-amber-800 uppercase tracking-tight">Atenção ao prazo de atualização</h3>
-                        <p class="mt-2 text-xs md:text-sm text-amber-700 leading-relaxed font-medium">
+                        <h3 class="text-sm font-bold text-amber-900 uppercase tracking-tight mb-1">Atenção ao prazo de atualização</h3>
+                        <p class="text-xs md:text-sm text-amber-700/90 leading-relaxed font-medium">
                             Se recebeu workflow de faturamento e o pedido não estiver disponível, aguarde até o final do dia, pois será atualizado por nós após o fechamento dos correios.
                         </p>
                     </div>
@@ -88,9 +122,9 @@
             </div>
 
             <!-- RODAPÉ -->
-            <div class="text-center pt-8 border-t border-gray-100">
-                <p class="text-slate-600 mb-3 text-sm font-medium">Dúvidas? Entre em contato:</p>
-                <a href="mailto:amostras@doremus.com.br" class="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-bold bg-blue-50 px-6 py-3 rounded-full transition-all border border-blue-100 shadow-sm">
+            <div class="text-center pt-8 border-t border-slate-100/50">
+                <p class="text-slate-500 mb-3 text-sm font-medium">Dúvidas? Entre em contato:</p>
+                <a href="mailto:amostras@doremus.com.br" class="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-bold bg-white hover:bg-blue-50 px-6 py-2.5 rounded-full transition-all border border-slate-200 hover:border-blue-200 shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                     amostras@doremus.com.br
                 </a>
@@ -123,15 +157,15 @@
 
         const icons = {
             check: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
-            copy: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`,
-            external: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`
+            copy: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`,
+            external: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`
         };
 
         function showStatus(msg, isError = false) {
             if(!statusMessage) return;
             statusMessage.textContent = msg;
             statusContainer.classList.remove('hidden');
-            statusMessage.className = `text-center text-sm font-bold py-3 px-6 rounded-xl border shadow-sm ${isError ? 'text-red-700 bg-red-50 border-red-100' : 'text-slate-600 bg-slate-50 border-slate-100'}`;
+            statusMessage.className = `text-center text-sm font-bold py-3 px-6 rounded-xl border shadow-sm ${isError ? 'text-red-700 bg-red-50 border-red-100' : 'text-slate-600 bg-slate-50 border-slate-200'}`;
         }
 
         function mapColumns(cols) {
@@ -196,7 +230,7 @@
             const queryLower = rawQuery.toLowerCase();
             
             if (!rawQuery) {
-                showStatus("Por favor, digite um número.", true);
+                showStatus("Por favor, digite um número de pedido válido.", true);
                 searchButton.disabled = false;
                 searchButton.innerHTML = originalBtnText;
                 setTimeout(() => orderInput.focus(), 100);
@@ -279,7 +313,7 @@
 
             } catch (error) {
                 console.error("Erro na busca:", error);
-                showStatus("Erro ao buscar dados. Tente novamente.", true);
+                showStatus("Erro ao buscar dados. Verifique sua conexão e tente novamente.", true);
             } finally {
                 searchButton.disabled = false;
                 searchButton.innerHTML = 'Buscar';
@@ -288,7 +322,7 @@
 
         function displayResults(orders, query) {
             if (orders.length === 0) {
-                showStatus(`Nenhum pedido encontrado para "${query}".`, false);
+                showStatus(`Nenhum pedido encontrado para a busca "${query}".`, false);
                 return;
             }
 
@@ -297,47 +331,47 @@
                 const hasTracking = rastreio && rastreio.toLowerCase() !== 'pendente' && rastreio.length > 5;
 
                 const cardHTML = `
-                    <div class="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden relative fade-in">
-                        <div class="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
-                        <div class="p-6 md:p-8 ml-2">
-                            <div class="flex justify-between items-start mb-6">
+                    <div class="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden relative fade-in">
+                        <div class="absolute top-0 left-0 w-1.5 h-full bg-blue-500"></div>
+                        <div class="p-6 md:p-8 ml-1">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                                 <div>
-                                    <span class="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1 block">Pedido</span>
+                                    <span class="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1 block">Detalhes do Pedido</span>
                                     <h2 class="text-3xl font-black text-slate-800 tracking-tighter">#${order.numeroPedido || 'N/A'}</h2>
-                                    <p class="text-slate-500 font-bold text-xs mt-1 truncate max-w-[200px]">${order.remetente || 'Cliente'}</p>
+                                    <p class="text-slate-500 font-medium text-sm mt-1 truncate max-w-xs md:max-w-md">${order.remetente || 'Cliente'}</p>
                                 </div>
-                                <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase border border-blue-100">
+                                <span class="px-3 py-1.5 bg-slate-50 text-slate-700 rounded-lg text-xs font-bold uppercase border border-slate-200">
                                     ${order.servico}
                                 </span>
                             </div>
 
                             <div class="grid grid-cols-2 gap-4 mb-8 bg-slate-50 p-4 rounded-xl border border-slate-100">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                                    <div class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center shadow-sm">
                                         ${icons.check}
                                     </div>
                                     <div class="flex flex-col">
-                                        <span class="text-[9px] font-bold text-slate-400 uppercase">Data</span>
-                                        <span class="text-xs font-bold text-slate-700">${order.dataLiberacao}</span>
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Data Liberação</span>
+                                        <span class="text-sm font-bold text-slate-700">${order.dataLiberacao}</span>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full ${hasTracking ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-400'} flex items-center justify-center">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+                                    <div class="w-10 h-10 rounded-full ${hasTracking ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-400'} flex items-center justify-center shadow-sm">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
                                     </div>
                                     <div class="flex flex-col">
-                                        <span class="text-[9px] font-bold text-slate-400 uppercase">Status</span>
-                                        <span class="text-xs font-bold ${hasTracking ? 'text-blue-600' : 'text-slate-500'}">${hasTracking ? 'Postado' : 'Aguardando'}</span>
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Status Correios</span>
+                                        <span class="text-sm font-bold ${hasTracking ? 'text-blue-600' : 'text-slate-500'}">${hasTracking ? 'Postado' : 'Aguardando'}</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="space-y-3">
-                                <label class="text-[10px] font-bold text-slate-400 uppercase px-1">Código de Rastreio</label>
-                                <div class="bg-gray-100 p-4 rounded-xl font-mono text-lg text-slate-700 border border-slate-200 flex items-center justify-between shadow-inner">
+                                <label class="text-xs font-bold text-slate-500 uppercase px-1">Código de Rastreamento</label>
+                                <div class="bg-white p-4 rounded-xl font-mono text-xl text-slate-800 border-2 border-slate-100 flex items-center justify-between shadow-sm">
                                     <span class="tracking-widest font-black truncate mr-2">${!hasTracking ? 'Disponível em breve' : rastreio}</span>
                                     ${hasTracking ? `
-                                        <button onclick="window.copyToClipboard('${rastreio}', this)" class="p-2 text-slate-400 hover:text-blue-600 transition-colors flex-shrink-0">
+                                        <button onclick="window.copyToClipboard('${rastreio}', this)" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0" title="Copiar código">
                                             ${icons.copy}
                                         </button>
                                     ` : ''}
@@ -345,8 +379,8 @@
                                 ${hasTracking ? `
                                     <a href="https://rastreamento.correios.com.br/app/index.php?objetos=${rastreio}" 
                                        target="_blank"
-                                       class="bg-green-600 hover:bg-green-700 text-white w-full py-4 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95">
-                                        <span>Rastrear Agora</span>
+                                       class="mt-4 bg-slate-900 hover:bg-slate-800 text-white w-full py-4 rounded-xl font-bold transition-all shadow-md flex items-center justify-center gap-2 active:scale-95">
+                                        <span>Acompanhar no site dos Correios</span>
                                         ${icons.external}
                                     </a>
                                 ` : ''}
@@ -365,12 +399,13 @@
             el.select();
             document.execCommand('copy');
             document.body.removeChild(el);
+            
             const original = btnElement.innerHTML;
             btnElement.innerHTML = icons.check;
-            btnElement.classList.add('text-green-600');
+            btnElement.classList.add('text-green-600', 'bg-green-50');
             setTimeout(() => {
                 btnElement.innerHTML = original;
-                btnElement.classList.remove('text-green-600');
+                btnElement.classList.remove('text-green-600', 'bg-green-50');
             }, 2000);
         }
 
@@ -390,9 +425,6 @@
     </script>
 </body>
 </html>
-
-
-
 
 
 
