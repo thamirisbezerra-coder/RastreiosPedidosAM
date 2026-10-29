@@ -170,6 +170,7 @@
                         <!-- Logo sem o filtro brightness para aparecer corretamente no fundo branco -->
                         <img src="https://i.postimg.cc/J0G8jfMQ/as-02-(2).png" alt="Logo Doremus" class="h-14 md:h-20 w-auto object-contain relative z-10 drop-shadow-sm">
                     </div>
+
                     <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight text-gradient pb-1">
                         Rastreio de Amostras
                     </h1>
@@ -187,19 +188,24 @@
                             <div class="absolute left-4 text-blue-500">
                                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                             </div>
-                            <input type="text" id="orderNumberInput" placeholder="Nº do pedido (Ex: 475896)" class="block w-full pl-14 pr-4 py-4 rounded-xl bg-transparent focus:outline-none text-lg text-slate-800 font-bold placeholder-slate-400" autocomplete="off" inputmode="text">
+                            <input type="text" id="orderNumberInput" placeholder="Nº do pedido (Ex: 475896)" class="block w-full pl-14 pr-12 py-4 rounded-xl bg-transparent focus:outline-none text-lg text-slate-800 font-bold placeholder-slate-400" autocomplete="off" inputmode="text">
+                            
+                            <!-- Botão Limpar -->
+                            <button id="clearBtn" type="button" class="hidden absolute right-4 text-slate-300 hover:text-slate-500 transition-colors p-1" title="Limpar busca">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
                         </div>
                         <button id="searchButton" type="button" class="btn-gradient text-white font-bold py-4 px-8 rounded-xl shadow-md flex items-center justify-center min-w-[140px] text-lg uppercase tracking-wider">
                             Buscar
                         </button>
                     </div>
-                </div>
 
-                <!-- STATUS NOTIFICATION -->
-                <div id="statusContainer" class="hidden mx-auto max-w-lg transition-all duration-300">
-                    <div id="statusBox" class="flex items-center justify-center gap-3 py-3 px-5 rounded-xl font-medium text-sm border backdrop-blur-md">
-                        <span id="statusIcon"></span>
-                        <p id="statusMessage"></p>
+                    <!-- Buscas Recentes -->
+                    <div id="recentSearchesContainer" class="hidden mt-4 text-center">
+                        <div class="flex items-center justify-center gap-2">
+                            <span class="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Recentes:</span>
+                            <div id="recentSearchesList" class="flex gap-2"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -212,7 +218,7 @@
             <footer class="bg-slate-50/50 backdrop-blur-lg border-t border-slate-200/50 p-6 text-center">
                 <div class="flex flex-col items-center justify-center gap-2">
                     <span class="text-slate-500 text-sm font-medium">Qualquer dúvida, envie um e-mail para:</span>
-                    <a href="mailto:amostras@doremus.com.br" class="inline-flex items-center gap-2 text-slate-700 hover:text-blue-700 font-bold transition-colors text-sm px-5 py-2.5 rounded-full glass-card border border-slate-200">
+                    <a href="https://mail.google.com/mail/?view=cm&fs=1&to=amostras@doremus.com.br" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-slate-700 hover:text-blue-700 font-bold transition-colors text-sm px-5 py-2.5 rounded-full glass-card border border-slate-200">
                         <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                         amostras@doremus.com.br
                     </a>
@@ -220,6 +226,9 @@
             </footer>
         </div>
     </main>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toastContainer" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none"></div>
 
     <script type="module">
         // CONFIGURAÇÃO DA PLANILHA (MANTIDA)
@@ -230,11 +239,11 @@
         // Elementos da DOM
         const searchButton = document.getElementById('searchButton');
         const orderInput = document.getElementById('orderNumberInput');
+        const clearBtn = document.getElementById('clearBtn');
         const resultsContainer = document.getElementById('shipmentsContainer');
-        const statusContainer = document.getElementById('statusContainer');
-        const statusBox = document.getElementById('statusBox');
-        const statusMessage = document.getElementById('statusMessage');
-        const statusIcon = document.getElementById('statusIcon');
+        const recentSearchesContainer = document.getElementById('recentSearchesContainer');
+        const recentSearchesList = document.getElementById('recentSearchesList');
+        const toastContainer = document.getElementById('toastContainer');
 
         // Ícones
         const icons = {
@@ -244,19 +253,104 @@
             error: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
         };
 
-        // Feedback Visual com Vidro
-        function showStatus(msg, type = 'info') {
-            if(!statusMessage) return;
-            statusMessage.textContent = msg;
-            statusContainer.classList.remove('hidden');
+        // Sistema de Notificação Flutuante (Toast)
+        function showToast(msg, type = 'info') {
+            const toast = document.createElement('div');
+            const isErr = type === 'error';
             
-            if (type === 'error') {
-                statusBox.className = 'flex items-center justify-center gap-3 py-3 px-5 rounded-xl font-medium text-sm bg-red-50 text-red-600 border border-red-200 shadow-sm backdrop-blur-md';
-                statusIcon.innerHTML = icons.error;
-            } else {
-                statusBox.className = 'flex items-center justify-center gap-3 py-3 px-5 rounded-xl font-medium text-sm bg-blue-50 text-blue-600 border border-blue-200 shadow-sm backdrop-blur-md';
-                statusIcon.innerHTML = icons.error; // info icon
-            }
+            toast.className = `glass-card pointer-events-auto border-l-4 ${isErr ? 'border-l-red-500 bg-white/90' : 'border-l-blue-500 bg-white/90'} px-5 py-4 rounded-r-2xl shadow-xl flex items-center gap-3 fade-in-up max-w-sm w-full backdrop-blur-xl border-y border-r border-slate-200`;
+            
+            toast.innerHTML = `
+                <div class="${isErr ? 'text-red-500 bg-red-50' : 'text-blue-500 bg-blue-50'} flex-shrink-0 p-1.5 rounded-full shadow-inner border border-${isErr ? 'red' : 'blue'}-100">
+                    ${isErr ? icons.error : icons.check}
+                </div>
+                <p class="text-sm font-bold text-slate-700 leading-tight">${msg}</p>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(15px)';
+                toast.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // Histórico de Buscas Recentes
+        function loadRecentSearches() {
+            try {
+                const recents = JSON.parse(localStorage.getItem('recentSearches') || '[]');
+                if (recents.length > 0) {
+                    recentSearchesContainer.classList.remove('hidden');
+                    recentSearchesList.innerHTML = recents.map(val => 
+                        `<button type="button" onclick="window.useRecent('${val}')" class="px-3 py-1 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-700 text-xs font-bold rounded-lg border border-slate-200 shadow-sm transition-all active:scale-95">${val}</button>`
+                    ).join('');
+                } else {
+                    recentSearchesContainer.classList.add('hidden');
+                }
+            } catch(e){}
+        }
+
+        function saveRecentSearch(val) {
+            if (!val) return;
+            try {
+                let recents = JSON.parse(localStorage.getItem('recentSearches') || '[]');
+                recents = recents.filter(item => item !== val);
+                recents.unshift(val);
+                if (recents.length > 3) recents.pop(); // Mantém os 3 mais recentes
+                localStorage.setItem('recentSearches', JSON.stringify(recents));
+                loadRecentSearches();
+            } catch(e){}
+        }
+
+        window.useRecent = function(val) {
+            orderInput.value = val;
+            clearBtn.classList.remove('hidden');
+            window.handleSearch();
+        }
+
+        // Interações do Input (Botão de Limpar)
+        orderInput.addEventListener('input', () => {
+            clearBtn.classList.toggle('hidden', orderInput.value.length === 0);
+        });
+
+        clearBtn.addEventListener('click', () => {
+            orderInput.value = '';
+            clearBtn.classList.add('hidden');
+            orderInput.focus();
+            resultsContainer.innerHTML = ''; // Limpa os resultados ao limpar a busca
+        });
+
+        // Efeito Skeleton Loading
+        function showSkeleton() {
+            resultsContainer.innerHTML = `
+                <div class="glass-card rounded-2xl overflow-hidden shadow-sm animate-pulse border border-slate-200">
+                    <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white/40">
+                        <div>
+                            <div class="h-2 w-24 bg-slate-300/50 rounded mb-3"></div>
+                            <div class="h-8 w-40 bg-slate-300/50 rounded"></div>
+                        </div>
+                        <div class="h-8 w-20 bg-slate-300/50 rounded-lg"></div>
+                    </div>
+                    <div class="p-6 space-y-6 bg-white/60">
+                        <div>
+                            <div class="h-2 w-20 bg-slate-300/50 rounded mb-2"></div>
+                            <div class="h-5 w-48 bg-slate-300/50 rounded"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-white/80 p-4 rounded-xl border border-slate-100">
+                                <div class="h-2 w-16 bg-slate-300/50 rounded mb-2"></div>
+                                <div class="h-4 w-24 bg-slate-300/50 rounded"></div>
+                            </div>
+                            <div class="bg-white/80 p-4 rounded-xl border border-slate-100">
+                                <div class="h-2 w-16 bg-slate-300/50 rounded mb-2"></div>
+                                <div class="h-4 w-24 bg-slate-300/50 rounded"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
         // Mapeamento dinâmico
@@ -288,23 +382,21 @@
 
         // Lógica de Busca
         window.handleSearch = async function() {
-            const originalBtnText = searchButton.innerHTML;
-            searchButton.disabled = true;
-            searchButton.innerHTML = `<div class="loader"></div>`;
-            resultsContainer.innerHTML = '';
-            statusContainer.classList.add('hidden');
-
             const rawQuery = orderInput.value.trim();
             const queryBase = getBaseId(rawQuery); 
             const queryLower = rawQuery.toLowerCase();
             
             if (!rawQuery) {
-                showStatus("Por favor, digite o número do pedido.", 'error');
-                searchButton.disabled = false;
-                searchButton.innerHTML = originalBtnText;
+                showToast("Por favor, digite o número do pedido.", 'error');
                 setTimeout(() => orderInput.focus(), 100);
                 return;
             }
+
+            const originalBtnText = searchButton.innerHTML;
+            searchButton.disabled = true;
+            searchButton.innerHTML = `<div class="loader"></div>`;
+            
+            showSkeleton(); // Mostra a animação de carregamento estilizada
 
             try {
                 const response = await fetch(SHEET_URL);
@@ -348,10 +440,19 @@
                     }
                 });
 
-                displayResults(foundOrders, orderInput.value);
+                resultsContainer.innerHTML = ''; // Limpa o skeleton
+
+                if (foundOrders.length === 0) {
+                    showToast(`Nenhum pedido localizado para "${rawQuery}".`, 'error');
+                } else {
+                    saveRecentSearch(queryBase); // Salva no histórico ao ter sucesso
+                    displayResults(foundOrders, orderInput.value);
+                }
+
             } catch (error) {
                 console.error(error);
-                showStatus("Erro ao conectar ao servidor. Tente novamente.", 'error');
+                resultsContainer.innerHTML = '';
+                showToast("Erro ao conectar ao servidor. Tente novamente.", 'error');
             } finally {
                 searchButton.disabled = false;
                 searchButton.innerHTML = 'Buscar';
@@ -360,11 +461,6 @@
 
         // Renderização Glassmorphism
         function displayResults(orders, query) {
-            if (orders.length === 0) {
-                showStatus(`Nenhum pedido localizado para "${query}".`, 'error');
-                return;
-            }
-
             orders.forEach((order, index) => {
                 const rastreio = (order.codigoRastreio || '').trim();
                 const hasTracking = rastreio && rastreio.toLowerCase() !== 'pendente' && rastreio.length > 5;
@@ -454,17 +550,18 @@
             
             const original = btnElement.innerHTML;
             btnElement.innerHTML = icons.check;
-            btnElement.classList.add('text-green-400');
+            btnElement.classList.add('text-green-500');
             btnElement.classList.remove('text-slate-400');
+            showToast('Código copiado com sucesso!'); // Feedback adicional
             
             setTimeout(() => {
                 btnElement.innerHTML = original;
-                btnElement.classList.remove('text-green-400');
+                btnElement.classList.remove('text-green-500');
                 btnElement.classList.add('text-slate-400');
             }, 2000);
         }
 
-        // Listeners
+        // Listeners Principais
         searchButton.addEventListener('click', (e) => {
             e.preventDefault();
             window.handleSearch();
@@ -475,7 +572,10 @@
                 window.handleSearch();
             }
         });
+
+        // Inicialização
         window.onload = () => {
+            loadRecentSearches(); // Carrega histórico ao abrir
             setTimeout(() => orderInput.focus(), 500);
         }
     </script>
