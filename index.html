@@ -181,7 +181,7 @@
 
                 <!-- SEARCH COMPONENT -->
                 <div class="max-w-xl mx-auto relative group">
-                    <div class="absolute -inset-1 bg-gradient-to-r from-blue-200 to-cyan-200 rounded-2xl blur opacity-40 group-focus-within:opacity-80 transition duration-500"></div>
+                    <div class="absolute -inset-1 bg-gradient-to-r from-blue-200 to-cyan-200 rounded-2xl blur opacity-40 group-focus-within:opacity-80 transition duration-500 pointer-events-none"></div>
                     
                     <div class="relative flex flex-col sm:flex-row gap-3 glass-card p-2 rounded-2xl input-glow border-white">
                         <div class="relative flex-grow flex items-center">
@@ -201,7 +201,7 @@
                     </div>
 
                     <!-- Buscas Recentes -->
-                    <div id="recentSearchesContainer" class="hidden mt-4 text-center">
+                    <div id="recentSearchesContainer" class="hidden mt-5 text-center relative z-10">
                         <div class="flex items-center justify-center gap-2">
                             <span class="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Recentes:</span>
                             <div id="recentSearchesList" class="flex gap-2"></div>
