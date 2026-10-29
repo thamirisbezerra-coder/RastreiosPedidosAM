@@ -4,221 +4,290 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Rastreamentos de Pedidos AM</title>
-    <!-- Favicon -->
     <link rel="icon" type="image/webp" href="https://i.postimg.cc/gwxjQTNv/correios2.webp">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f8fafc;
-            /* Grid background moderno e sutil */
-            background-image: 
-                linear-gradient(to right, #e2e8f0 1px, transparent 1px),
-                linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
-            background-size: 32px 32px;
+            background-color: #f8fafc; /* Fundo claro/branco */
+            color: #0f172a;
             -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden;
         }
-        
-        /* Pseudo-elemento para dar um gradiente suave de fundo por cima do grid */
-        body::before {
-            content: '';
+
+        /* ORBES ANIMADOS DE FUNDO (TEMA CLARO COM AZUIS) */
+        .bg-shapes {
             position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: radial-gradient(circle at top center, rgba(239, 246, 255, 0.8), rgba(248, 250, 252, 0.95) 100%);
+            top: 0; left: 0; width: 100vw; height: 100vh;
             z-index: -1;
+            overflow: hidden;
+            background: #f8fafc;
         }
-
-        .loader {
-            border: 3px solid rgba(255,255,255,0.3);
+        .shape {
+            position: absolute;
             border-radius: 50%;
-            border-top: 3px solid #ffffff;
-            width: 22px;
-            height: 22px;
-            animation: spin 0.8s linear infinite;
+            filter: blur(100px); /* Aumentado o blur para deixar mais difuso */
+            animation: float 20s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0.25; /* Opacidade reduzida para efeitos mais leves */
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        .fade-in { animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        .shape-1 {
+            width: 500px; height: 500px;
+            background: linear-gradient(135deg, #1e3a8a, #3b82f6); /* Azul escuro / Marinho */
+            top: -100px; left: -100px;
+        }
+        .shape-2 {
+            width: 400px; height: 400px;
+            background: linear-gradient(135deg, #312e81, #4f46e5); /* Indigo escuro */
+            bottom: -50px; right: -100px;
+            animation-delay: -5s;
+            animation-direction: alternate-reverse;
+        }
+        .shape-3 {
+            width: 300px; height: 300px;
+            background: linear-gradient(135deg, #0f172a, #1d4ed8); /* Slate escuro e Azul forte */
+            top: 40%; left: 50%;
+            transform: translate(-50%, -50%);
+            animation-delay: -10s;
+        }
 
-        /* Esconder ícone de X padrão do input type search/text em alguns browsers */
+        @keyframes float {
+            0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+            33% { transform: translate(30px, -50px) rotate(10deg) scale(1.1); }
+            66% { transform: translate(-20px, 20px) rotate(-5deg) scale(0.9); }
+            100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+        }
+
+        /* EFEITOS DE VIDRO LIGHT (GLASSMORPHISM CLARO) */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.05), 0 0 20px rgba(59, 130, 246, 0.05);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), inset 0 0 20px rgba(255,255,255,0.5);
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.9);
+            border-color: rgba(255, 255, 255, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Custom Input */
         input[type="text"]::-webkit-search-decoration,
         input[type="text"]::-webkit-search-cancel-button,
         input[type="text"]::-webkit-search-results-button,
         input[type="text"]::-webkit-search-results-decoration { display: none; }
+        
+        .input-glow:focus-within {
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.4);
+            background: rgba(255, 255, 255, 0.95);
+        }
 
-        @media screen and (max-width: 768px) { input { font-size: 16px !important; } }
+        /* Animações UI */
+        .loader {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 3px solid #fff;
+            width: 24px;
+            height: 24px;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .fade-in-up { 
+            animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+
+        .text-gradient {
+            background: linear-gradient(to right, #1e3a8a, #2563eb); /* Título também num azul mais escuro */
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Botão Gradient Animado */
+        .btn-gradient {
+            background: linear-gradient(45deg, #1e3a8a, #1d4ed8, #1e40af); /* Azuis mais escuros */
+            background-size: 200% 200%;
+            animation: gradientMove 5s ease infinite;
+            transition: all 0.3s ease;
+        }
+        .btn-gradient:hover {
+            box-shadow: 0 0 20px rgba(30, 58, 138, 0.3);
+            transform: scale(1.02);
+        }
+        .btn-gradient:active { transform: scale(0.95); }
+        
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-start md:justify-center p-4 pt-8 md:pt-4 relative">
+<body class="min-h-screen flex flex-col items-center justify-start md:justify-center p-4 pt-8 md:pt-12 relative">
 
-    <!-- Container de Erro Global -->
-    <div id="globalError" class="hidden fixed top-0 left-0 w-full bg-red-500 text-white p-3 text-center z-50 font-bold text-xs shadow-md"></div>
-
-    <div class="w-full max-w-3xl bg-white/80 backdrop-blur-xl shadow-2xl rounded-[2rem] overflow-hidden border border-white/50 relative">
-        <!-- Detalhe decorativo no topo do card -->
-        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
-        
-        <div class="p-6 md:p-12 space-y-8 relative z-10">
-            
-            <!-- LOGO -->
-            <div class="flex justify-center mb-4 md:mb-6">
-                <img src="https://i.postimg.cc/J0G8jfMQ/as-02-(2).png" alt="Logo Doremus" class="h-16 md:h-24 w-auto object-contain opacity-90 hover:opacity-100 transition-opacity duration-300">
-            </div>
-
-            <!-- CABEÇALHO -->
-            <div class="text-center space-y-3">
-                <h1 class="text-3xl md:text-4xl font-extrabold text-slate-800 tracking-tight">Rastreamento de Amostras</h1>
-                <p class="text-slate-500 text-sm md:text-base font-medium">Consulte rapidamente o status do seu pedido</p>
-            </div>
-
-            <!-- BUSCA -->
-            <div class="relative max-w-2xl mx-auto group">
-                <!-- Efeito de brilho sutil atrás da busca -->
-                <div class="absolute -inset-1 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-[1.5rem] blur opacity-50 group-focus-within:opacity-100 transition duration-500"></div>
-                
-                <div class="relative bg-white rounded-2xl p-1.5 border-2 border-slate-100 flex flex-col md:flex-row gap-2 focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-400/10 transition-all shadow-sm">
-                    <div class="relative flex-grow flex items-center">
-                        <div class="absolute left-4 flex items-center pointer-events-none text-slate-400">
-                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        </div>
-                        <input type="text" id="orderNumberInput" placeholder="Número do pedido (ex: 475896)..." class="block w-full pl-12 pr-4 py-3 md:py-4 rounded-xl leading-5 bg-transparent focus:outline-none text-lg text-slate-700 font-medium placeholder-slate-400" autocomplete="off" inputmode="text">
-                    </div>
-                    <button id="searchButton" type="button" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3.5 md:py-4 px-8 rounded-xl shadow-md flex items-center justify-center min-w-[140px] text-lg active:scale-95 transition-all">
-                        Buscar
-                    </button>
-                </div>
-            </div>
-
-            <!-- STATUS DE FEEDBACK -->
-            <div id="statusContainer" class="hidden mx-auto max-w-lg fade-in">
-                <p id="statusMessage" class="text-center text-sm font-bold py-3 px-6 rounded-xl border shadow-sm"></p>
-            </div>
-
-            <!-- RESULTADOS -->
-            <div id="shipmentsContainer" class="space-y-6"></div>
-
-            <!-- QUADRO DE AVISO -->
-            <div class="bg-amber-50/80 border border-amber-200/60 p-5 rounded-2xl shadow-sm relative overflow-hidden group">
-                <div class="absolute right-0 top-0 w-24 h-24 bg-amber-400/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                <div class="flex items-start relative z-10">
-                    <div class="flex-shrink-0 mt-0.5 bg-amber-100 p-1.5 rounded-lg text-amber-600">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                    <div class="ml-3">
-                        <h3 class="text-sm font-bold text-amber-900 uppercase tracking-tight mb-1">Atenção ao prazo de atualização</h3>
-                        <p class="text-xs md:text-sm text-amber-700/90 leading-relaxed font-medium">
-                            Se recebeu workflow de faturamento e o pedido não estiver disponível, aguarde até o final do dia, pois será atualizado por nós após o fechamento dos correios.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- RODAPÉ -->
-            <div class="text-center pt-8 border-t border-slate-100/50">
-                <p class="text-slate-500 mb-3 text-sm font-medium">Dúvidas? Entre em contato:</p>
-                <a href="mailto:amostras@doremus.com.br" class="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-bold bg-white hover:bg-blue-50 px-6 py-2.5 rounded-full transition-all border border-slate-200 hover:border-blue-200 shadow-sm">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                    amostras@doremus.com.br
-                </a>
-                <p class="text-slate-400 text-[10px] mt-8 uppercase tracking-widest font-bold">© 2025 Doremus. Todos os direitos reservados.</p>
-            </div>
-        </div>
+    <!-- FUNDO ANIMADO -->
+    <div class="bg-shapes">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+        <div class="shape shape-3"></div>
     </div>
 
-    <!-- Script de Erro Global -->
-    <script>
-        window.onerror = function(message, source, lineno, colno, error) {
-            const el = document.getElementById('globalError');
-            el.textContent = `Erro do Sistema: ${message}`;
-            el.classList.remove('hidden');
-            console.error("Global Error:", error);
-        };
-    </script>
+    <!-- MAIN WRAPPER -->
+    <main class="w-full max-w-3xl fade-in-up z-10 relative">
+        
+        <!-- CARD PRINCIPAL DE VIDRO -->
+        <div class="glass-panel rounded-[2rem] overflow-hidden relative">
+            
+            <!-- Brilho no topo -->
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 opacity-80"></div>
+            
+            <div class="p-6 md:p-10 space-y-10">
+                
+                <!-- HEADER & LOGO -->
+                <header class="text-center space-y-4">
+                    <div class="flex justify-center mb-6 relative">
+                        <!-- Brilho atrás do logo -->
+                        <div class="absolute inset-0 bg-blue-50/50 blur-2xl rounded-full scale-150 z-0"></div>
+                        <!-- Logo sem o filtro brightness para aparecer corretamente no fundo branco -->
+                        <img src="https://i.postimg.cc/J0G8jfMQ/as-02-(2).png" alt="Logo Doremus" class="h-14 md:h-20 w-auto object-contain relative z-10 drop-shadow-sm">
+                    </div>
+                    <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight text-gradient pb-1">
+                        Rastreio de Amostras
+                    </h1>
+                    <p class="text-slate-500 text-sm md:text-base font-medium">
+                        Tecnologia e rapidez no acompanhamento do seu pedido.
+                    </p>
+                </header>
+
+                <!-- SEARCH COMPONENT -->
+                <div class="max-w-xl mx-auto relative group">
+                    <div class="absolute -inset-1 bg-gradient-to-r from-blue-200 to-cyan-200 rounded-2xl blur opacity-40 group-focus-within:opacity-80 transition duration-500"></div>
+                    
+                    <div class="relative flex flex-col sm:flex-row gap-3 glass-card p-2 rounded-2xl input-glow border-white">
+                        <div class="relative flex-grow flex items-center">
+                            <div class="absolute left-4 text-blue-500">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            </div>
+                            <input type="text" id="orderNumberInput" placeholder="Nº do pedido (Ex: 475896)" class="block w-full pl-14 pr-4 py-4 rounded-xl bg-transparent focus:outline-none text-lg text-slate-800 font-bold placeholder-slate-400" autocomplete="off" inputmode="text">
+                        </div>
+                        <button id="searchButton" type="button" class="btn-gradient text-white font-bold py-4 px-8 rounded-xl shadow-md flex items-center justify-center min-w-[140px] text-lg uppercase tracking-wider">
+                            Buscar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STATUS NOTIFICATION -->
+                <div id="statusContainer" class="hidden mx-auto max-w-lg transition-all duration-300">
+                    <div id="statusBox" class="flex items-center justify-center gap-3 py-3 px-5 rounded-xl font-medium text-sm border backdrop-blur-md">
+                        <span id="statusIcon"></span>
+                        <p id="statusMessage"></p>
+                    </div>
+                </div>
+
+                <!-- RESULTS CONTAINER -->
+                <div id="shipmentsContainer" class="space-y-6 pt-2"></div>
+
+            </div>
+            
+            <!-- FOOTER -->
+            <footer class="bg-slate-50/50 backdrop-blur-lg border-t border-slate-200/50 p-6 text-center">
+                <div class="flex flex-col items-center justify-center gap-2">
+                    <span class="text-slate-500 text-sm font-medium">Qualquer dúvida, envie um e-mail para:</span>
+                    <a href="mailto:amostras@doremus.com.br" class="inline-flex items-center gap-2 text-slate-700 hover:text-blue-700 font-bold transition-colors text-sm px-5 py-2.5 rounded-full glass-card border border-slate-200">
+                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                        amostras@doremus.com.br
+                    </a>
+                </div>
+            </footer>
+        </div>
+    </main>
 
     <script type="module">
-        // CONFIGURAÇÃO DA PLANILHA
+        // CONFIGURAÇÃO DA PLANILHA (MANTIDA)
         const SHEET_ID = '1Lwsx97SijssRttyUjnbseGhVTSXiciXtZ6Acszsi0h8'; 
         const SHEET_GID = '0'; 
         const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}`;
 
+        // Elementos da DOM
         const searchButton = document.getElementById('searchButton');
         const orderInput = document.getElementById('orderNumberInput');
         const resultsContainer = document.getElementById('shipmentsContainer');
         const statusContainer = document.getElementById('statusContainer');
+        const statusBox = document.getElementById('statusBox');
         const statusMessage = document.getElementById('statusMessage');
+        const statusIcon = document.getElementById('statusIcon');
 
+        // Ícones
         const icons = {
-            check: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
-            copy: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`,
-            external: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`
+            check: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
+            copy: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`,
+            external: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`,
+            error: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
         };
 
-        function showStatus(msg, isError = false) {
+        // Feedback Visual com Vidro
+        function showStatus(msg, type = 'info') {
             if(!statusMessage) return;
             statusMessage.textContent = msg;
             statusContainer.classList.remove('hidden');
-            statusMessage.className = `text-center text-sm font-bold py-3 px-6 rounded-xl border shadow-sm ${isError ? 'text-red-700 bg-red-50 border-red-100' : 'text-slate-600 bg-slate-50 border-slate-200'}`;
+            
+            if (type === 'error') {
+                statusBox.className = 'flex items-center justify-center gap-3 py-3 px-5 rounded-xl font-medium text-sm bg-red-50 text-red-600 border border-red-200 shadow-sm backdrop-blur-md';
+                statusIcon.innerHTML = icons.error;
+            } else {
+                statusBox.className = 'flex items-center justify-center gap-3 py-3 px-5 rounded-xl font-medium text-sm bg-blue-50 text-blue-600 border border-blue-200 shadow-sm backdrop-blur-md';
+                statusIcon.innerHTML = icons.error; // info icon
+            }
         }
 
+        // Mapeamento dinâmico
         function mapColumns(cols) {
-            const map = {
-                pedido: -1,
-                cliente: -1,
-                data: -1,
-                servico: -1,
-                rastreio: -1
-            };
-
+            const map = { pedido: -1, cliente: -1, data: -1, servico: -1, rastreio: -1 };
             cols.forEach((col, index) => {
                 const label = (col.label || '').toLowerCase().trim();
-                
                 if (label.includes('pedido') || label.includes('nº') || label.includes('order')) map.pedido = index;
                 else if (label.includes('cliente') || label.includes('remetente') || label.includes('nome')) map.cliente = index;
                 else if (label.includes('rastreio') || label.includes('objeto') || label.includes('tracking')) map.rastreio = index;
                 else if (label.includes('data') || label.includes('emissão')) map.data = index;
                 else if (label.includes('serviço') || label.includes('tipo')) map.servico = index;
             });
-
-            // Mapeamento padrão (Fallback) se não encontrar cabeçalhos exatos
             if (map.pedido === -1) map.pedido = 0; 
             if (map.cliente === -1) map.cliente = 1;
             if (map.data === -1) map.data = 2;
             if (map.servico === -1) map.servico = 3; 
             if (map.rastreio === -1) map.rastreio = 4;
-
             return map;
         }
 
-        // ============================================================
-        // FUNÇÃO CRÍTICA: Extrai apenas o número base do pedido
-        // Transforma "475896/1396" em "475896"
-        // Transforma "475896 - Parte 1" em "475896"
-        // ============================================================
         function getBaseId(str) {
             if (!str) return '';
-            // Converte para string
             const s = String(str);
-            // Quebra a string onde tiver barra (/), traço (-), ponto (.) ou espaço
-            // e pega somente a primeira parte
             const firstPart = s.split(/[\/\-\.\s]/)[0];
-            // Remove qualquer coisa que não seja letra ou número e deixa minúsculo
             return firstPart.replace(/[^a-z0-9]/gi, '').toLowerCase();
         }
-
-        // Função de normalização simples para textos gerais
         const normalize = (str) => String(str || '').toLowerCase().trim();
 
+        // Lógica de Busca
         window.handleSearch = async function() {
-            console.log("Iniciando busca na planilha...");
-            
             const originalBtnText = searchButton.innerHTML;
             searchButton.disabled = true;
             searchButton.innerHTML = `<div class="loader"></div>`;
@@ -226,11 +295,11 @@
             statusContainer.classList.add('hidden');
 
             const rawQuery = orderInput.value.trim();
-            const queryBase = getBaseId(rawQuery); // Ex: user digita "475896" -> queryBase "475896"
+            const queryBase = getBaseId(rawQuery); 
             const queryLower = rawQuery.toLowerCase();
             
             if (!rawQuery) {
-                showStatus("Por favor, digite um número de pedido válido.", true);
+                showStatus("Por favor, digite o número do pedido.", 'error');
                 searchButton.disabled = false;
                 searchButton.innerHTML = originalBtnText;
                 setTimeout(() => orderInput.focus(), 100);
@@ -239,152 +308,134 @@
 
             try {
                 const response = await fetch(SHEET_URL);
-                if (!response.ok) throw new Error("Erro de conexão com a planilha.");
-
+                if (!response.ok) throw new Error("Erro de conexão.");
                 const textData = await response.text();
-                // Extrai o JSON que vem dentro da resposta do Google
                 const jsonString = textData.match(/google\.visualization\.Query\.setResponse\(([\s\S\w]+)\);/);
                 
-                if (!jsonString || !jsonString[1]) throw new Error("Erro ao processar dados.");
-
+                if (!jsonString || !jsonString[1]) throw new Error("Dados inválidos.");
                 const data = JSON.parse(jsonString[1]);
-                const table = data.table;
-                const colMap = mapColumns(table.cols);
-                const rows = table.rows;
+                const colMap = mapColumns(data.table.cols);
+                const rows = data.table.rows;
 
                 const foundOrders = [];
-                // IMPORTANTE: Conjunto para evitar duplicatas baseadas no ID Base
                 const seenBaseIds = new Set();
 
                 rows.forEach(row => {
-                    const cells = row.c;
-                    if (!cells) return;
-
+                    if (!row.c) return;
                     const getVal = (idx) => {
-                        const cell = cells[idx];
-                        if (!cell) return '';
-                        return cell.f ? String(cell.f) : (cell.v ? String(cell.v) : '');
+                        const cell = row.c[idx];
+                        return cell ? (cell.f ? String(cell.f) : (cell.v ? String(cell.v) : '')) : '';
                     };
 
-                    // Valores da linha atual
                     const pedidoVal = getVal(colMap.pedido);
                     const rastreioVal = getVal(colMap.rastreio);
                     const clienteVal = getVal(colMap.cliente);
-
-                    // Identidade Base da linha (Ex: "475896/1396" vira "475896")
                     const rowBaseId = getBaseId(pedidoVal); 
 
-                    // LÓGICA DE MATCH
-                    let isMatch = false;
-
-                    // 1. O número base da busca bate com o número base da linha? (Prioridade)
-                    if (rowBaseId && queryBase && rowBaseId === queryBase) {
-                        isMatch = true;
-                    }
-                    // 2. Ou o texto normal contém a busca?
-                    else if (normalize(pedidoVal).includes(queryLower) || 
-                             normalize(rastreioVal).includes(queryLower) || 
-                             normalize(clienteVal).includes(queryLower)) {
-                        isMatch = true;
-                    }
+                    let isMatch = (rowBaseId && queryBase && rowBaseId === queryBase) || 
+                                  normalize(pedidoVal).includes(queryLower) || 
+                                  normalize(rastreioVal).includes(queryLower) || 
+                                  normalize(clienteVal).includes(queryLower);
 
                     if (isMatch) {
-                        // VERIFICAÇÃO DE DUPLICATA:
-                        // Se já mostramos um pedido com esse ID Base, ignoramos este aqui.
-                        // Isso garante que "475896" apareça apenas UMA VEZ.
-                        if (seenBaseIds.has(rowBaseId)) {
-                            return; // Pula essa iteração
-                        }
-
-                        // Se não é duplicata, adiciona aos vistos e aos resultados
+                        if (seenBaseIds.has(rowBaseId)) return;
                         seenBaseIds.add(rowBaseId);
-
                         foundOrders.push({
-                            numeroPedido: pedidoVal,
-                            remetente: clienteVal,
+                            numeroPedido: pedidoVal, remetente: clienteVal,
                             dataLiberacao: getVal(colMap.data) || '-',
-                            codigoRastreio: rastreioVal,
-                            servico: getVal(colMap.servico) || 'Padrão'
+                            codigoRastreio: rastreioVal, servico: getVal(colMap.servico) || 'Padrão'
                         });
                     }
                 });
 
                 displayResults(foundOrders, orderInput.value);
-
             } catch (error) {
-                console.error("Erro na busca:", error);
-                showStatus("Erro ao buscar dados. Verifique sua conexão e tente novamente.", true);
+                console.error(error);
+                showStatus("Erro ao conectar ao servidor. Tente novamente.", 'error');
             } finally {
                 searchButton.disabled = false;
                 searchButton.innerHTML = 'Buscar';
             }
         };
 
+        // Renderização Glassmorphism
         function displayResults(orders, query) {
             if (orders.length === 0) {
-                showStatus(`Nenhum pedido encontrado para a busca "${query}".`, false);
+                showStatus(`Nenhum pedido localizado para "${query}".`, 'error');
                 return;
             }
 
-            orders.forEach(order => {
+            orders.forEach((order, index) => {
                 const rastreio = (order.codigoRastreio || '').trim();
                 const hasTracking = rastreio && rastreio.toLowerCase() !== 'pendente' && rastreio.length > 5;
+                const delay = index * 0.1; 
 
                 const cardHTML = `
-                    <div class="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden relative fade-in">
-                        <div class="absolute top-0 left-0 w-1.5 h-full bg-blue-500"></div>
-                        <div class="p-6 md:p-8 ml-1">
-                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                                <div>
-                                    <span class="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1 block">Detalhes do Pedido</span>
-                                    <h2 class="text-3xl font-black text-slate-800 tracking-tighter">#${order.numeroPedido || 'N/A'}</h2>
-                                    <p class="text-slate-500 font-medium text-sm mt-1 truncate max-w-xs md:max-w-md">${order.remetente || 'Cliente'}</p>
-                                </div>
-                                <span class="px-3 py-1.5 bg-slate-50 text-slate-700 rounded-lg text-xs font-bold uppercase border border-slate-200">
-                                    ${order.servico}
-                                </span>
+                    <div class="glass-card rounded-2xl overflow-hidden fade-in-up border border-slate-200 shadow-sm" style="animation-delay: ${delay}s">
+                        
+                        <!-- Topo do Card -->
+                        <div class="px-6 py-5 border-b border-slate-100 flex flex-wrap justify-between items-center gap-3 bg-white/40">
+                            <div class="flex flex-col">
+                                <span class="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1">Status do Pedido</span>
+                                <h2 class="text-3xl font-black text-slate-800 tracking-tight">#${order.numeroPedido || 'N/A'}</h2>
+                            </div>
+                            <span class="px-4 py-2 bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider rounded-lg border border-blue-100 shadow-sm">
+                                ${order.servico}
+                            </span>
+                        </div>
+
+                        <!-- Detalhes Internos -->
+                        <div class="p-6 space-y-6 relative bg-white/60">
+                            
+                            <!-- Efeito de brilho suave dentro do card -->
+                            <div class="absolute top-0 right-0 w-32 h-32 bg-blue-400/5 rounded-full blur-3xl pointer-events-none"></div>
+
+                            <div>
+                                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Destinatário</p>
+                                <p class="text-lg font-bold text-slate-700">${order.remetente || 'Não informado'}</p>
                             </div>
 
-                            <div class="grid grid-cols-2 gap-4 mb-8 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center shadow-sm">
-                                        ${icons.check}
-                                    </div>
-                                    <div class="flex flex-col">
-                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Data Liberação</span>
-                                        <span class="text-sm font-bold text-slate-700">${order.dataLiberacao}</span>
-                                    </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="bg-white/80 p-4 rounded-xl border border-slate-100 shadow-sm">
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Liberação</p>
+                                    <p class="text-sm font-bold text-slate-700">${order.dataLiberacao}</p>
                                 </div>
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-full ${hasTracking ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-400'} flex items-center justify-center shadow-sm">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
-                                    </div>
-                                    <div class="flex flex-col">
-                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Status Correios</span>
-                                        <span class="text-sm font-bold ${hasTracking ? 'text-blue-600' : 'text-slate-500'}">${hasTracking ? 'Postado' : 'Aguardando'}</span>
+                                <div class="bg-white/80 p-4 rounded-xl border border-slate-100 shadow-sm">
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Correios</p>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-2.5 h-2.5 rounded-full shadow-sm ${hasTracking ? 'bg-green-500' : 'bg-amber-400'}"></div>
+                                        <p class="text-sm font-bold text-slate-700">
+                                            ${hasTracking ? 'Postado' : 'Pendente'}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="space-y-3">
-                                <label class="text-xs font-bold text-slate-500 uppercase px-1">Código de Rastreamento</label>
-                                <div class="bg-white p-4 rounded-xl font-mono text-xl text-slate-800 border-2 border-slate-100 flex items-center justify-between shadow-sm">
-                                    <span class="tracking-widest font-black truncate mr-2">${!hasTracking ? 'Disponível em breve' : rastreio}</span>
+                            <!-- Área do Rastreio -->
+                            <div class="mt-6 pt-6 border-t border-slate-100">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Código de Rastreamento</p>
+                                
+                                <div class="flex flex-col sm:flex-row gap-4">
+                                    <div class="flex-grow flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-inner">
+                                        <span class="font-mono text-xl font-bold text-slate-800 tracking-widest truncate mr-2">
+                                            ${!hasTracking ? 'EM BREVE' : rastreio}
+                                        </span>
+                                        ${hasTracking ? `
+                                            <button onclick="window.copyToClipboard('${rastreio}', this)" class="text-slate-400 hover:text-blue-600 transition-colors p-2 bg-white rounded-lg border border-slate-200 shadow-sm hover:bg-blue-50" title="Copiar código">
+                                                ${icons.copy}
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                    
                                     ${hasTracking ? `
-                                        <button onclick="window.copyToClipboard('${rastreio}', this)" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0" title="Copiar código">
-                                            ${icons.copy}
-                                        </button>
+                                        <a href="https://rastreamento.correios.com.br/app/index.php?objetos=${rastreio}" target="_blank" class="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-8 py-4 rounded-xl transition-all shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)] hover:-translate-y-1 flex items-center justify-center gap-2">
+                                            Acompanhar
+                                            ${icons.external}
+                                        </a>
                                     ` : ''}
                                 </div>
-                                ${hasTracking ? `
-                                    <a href="https://rastreamento.correios.com.br/app/index.php?objetos=${rastreio}" 
-                                       target="_blank"
-                                       class="mt-4 bg-slate-900 hover:bg-slate-800 text-white w-full py-4 rounded-xl font-bold transition-all shadow-md flex items-center justify-center gap-2 active:scale-95">
-                                        <span>Acompanhar no site dos Correios</span>
-                                        ${icons.external}
-                                    </a>
-                                ` : ''}
                             </div>
+
                         </div>
                     </div>
                 `;
@@ -392,6 +443,7 @@
             });
         }
 
+        // Função de Copiar
         window.copyToClipboard = function(text, btnElement) {
             const el = document.createElement('textarea');
             el.value = text;
@@ -402,33 +454,30 @@
             
             const original = btnElement.innerHTML;
             btnElement.innerHTML = icons.check;
-            btnElement.classList.add('text-green-600', 'bg-green-50');
+            btnElement.classList.add('text-green-400');
+            btnElement.classList.remove('text-slate-400');
+            
             setTimeout(() => {
                 btnElement.innerHTML = original;
-                btnElement.classList.remove('text-green-600', 'bg-green-50');
+                btnElement.classList.remove('text-green-400');
+                btnElement.classList.add('text-slate-400');
             }, 2000);
         }
 
-        // Listeners de Evento
+        // Listeners
         searchButton.addEventListener('click', (e) => {
             e.preventDefault();
             window.handleSearch();
         });
-
         orderInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 window.handleSearch();
             }
         });
-
+        window.onload = () => {
+            setTimeout(() => orderInput.focus(), 500);
+        }
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
